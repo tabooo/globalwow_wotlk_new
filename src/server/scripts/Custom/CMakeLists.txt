@@ -10,6 +10,8 @@
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
+  Custom/_duel_reset_script.cpp
+  Custom/_pvp_title_system.cpp
 )
 
 message("  -> Prepared: Custom")
