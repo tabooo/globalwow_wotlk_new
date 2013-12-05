@@ -346,6 +346,7 @@ m_isRemoved(false), m_isSingleTarget(false), m_isUsingCharges(false)
     m_isUsingCharges = m_procCharges != 0;
     memset(m_effects, 0, sizeof(m_effects));
     // m_casterLevel = cast item level/caster level, caster level should be saved to db, confirmed with sniffs
+    m_dropEvent = NULL;
 }
 
 AuraScript* Aura::GetScriptByName(std::string const& scriptName) const
@@ -466,6 +467,12 @@ void Aura::_Remove(AuraRemoveMode removeMode)
         Unit* target = aurApp->GetTarget();
         target->_UnapplyAura(aurApp, removeMode);
         appItr = m_applications.begin();
+    }
+
+    if (m_dropEvent)
+    {
+        m_dropEvent->to_Abort = true;
+        m_dropEvent = NULL;
     }
 }
 
@@ -813,6 +820,26 @@ bool Aura::ModCharges(int32 num, AuraRemoveMode removeMode)
     }
 
     return false;
+}
+
+void Aura::ModChargesDelayed(int32 num, AuraRemoveMode removeMode)
+{
+    m_dropEvent = NULL;
+    ModCharges(num, removeMode);
+}
+
+void Aura::DropChargeDelayed(uint32 delay, AuraRemoveMode removeMode)
+{
+    // aura is already during delayed charge drop
+    if (m_dropEvent)
+        return;
+    // only units have events
+    Unit* owner = m_owner->ToUnit();
+    if (!owner)
+        return;
+
+    m_dropEvent = new ChargeDropEvent(this, removeMode);
+    owner->m_Events.AddEvent(m_dropEvent, owner->m_Events.CalculateTime(delay));
 }
 
 void Aura::SetStackAmount(uint8 stackAmount)
@@ -2538,3 +2565,9 @@ void DynObjAura::FillTargetMap(std::map<Unit*, uint8> & targets, Unit* /*caster*
     }
 }
 
+bool ChargeDropEvent::Execute(uint64 /*e_time*/, uint32 /*p_time*/)
+{
+    // _base is always valid (look in Aura::_Remove())
+    _base->ModChargesDelayed(-1, _mode);
+    return true;
+}
