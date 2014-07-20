@@ -12,8 +12,6 @@
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
-  Custom/duel_reset_script.cpp
-  Custom/pvp_title_system.cpp
 #  ${sources_Custom}
 )
 
