@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -91,7 +91,7 @@ class boss_akilzon : public CreatureScript
                 memset(BirdGUIDs, 0, sizeof(BirdGUIDs));
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 _Reset();
 
@@ -105,7 +105,7 @@ class boss_akilzon : public CreatureScript
                 SetWeather(WEATHER_STATE_FINE, 0.0f);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 events.ScheduleEvent(EVENT_STATIC_DISRUPTION, urand(10000, 20000)); // 10 to 20 seconds (bosskillers)
                 events.ScheduleEvent(EVENT_GUST_OF_WIND, urand(20000, 30000));      // 20 to 30 seconds(bosskillers)
@@ -116,19 +116,19 @@ class boss_akilzon : public CreatureScript
 
                 Talk(SAY_AGGRO);
                 //DoZoneInCombat();
-                if (instance)
-                    instance->SetData(DATA_AKILZONEVENT, IN_PROGRESS);
+                instance->SetData(DATA_AKILZONEVENT, IN_PROGRESS);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 Talk(SAY_DEATH);
                 _JustDied();
             }
 
-            void KilledUnit(Unit* /*victim*/) OVERRIDE
+            void KilledUnit(Unit* who) override
             {
-                Talk(SAY_KILL);
+                if (who->GetTypeId() == TYPEID_PLAYER)
+                    Talk(SAY_KILL);
             }
 
             void SetWeather(uint32 weather, float grade)
@@ -214,7 +214,7 @@ class boss_akilzon : public CreatureScript
                 events.ScheduleEvent(EVENT_STORM_SEQUENCE, 1000);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -228,10 +228,14 @@ class boss_akilzon : public CreatureScript
                         case EVENT_STATIC_DISRUPTION:
                             {
                             Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1);
-                            if (!target) target = me->GetVictim();
-                            TargetGUID = target->GetGUID();
-                            DoCast(target, SPELL_STATIC_DISRUPTION, false);
-                            me->SetInFront(me->GetVictim());
+                            if (!target)
+                                target = me->GetVictim();
+                            if (target)
+                            {
+                                TargetGUID = target->GetGUID();
+                                DoCast(target, SPELL_STATIC_DISRUPTION, false);
+                                me->SetInFront(me->GetVictim());
+                            }
                             /*if (float dist = me->IsWithinDist3d(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 5.0f) dist = 5.0f;
                             SDisruptAOEVisual_Timer = 1000 + floor(dist / 30 * 1000.0f);*/
                             events.ScheduleEvent(EVENT_STATIC_DISRUPTION, urand(10000, 18000));
@@ -240,8 +244,10 @@ class boss_akilzon : public CreatureScript
                         case EVENT_GUST_OF_WIND:
                             {
                                 Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1);
-                                if (!target) target = me->GetVictim();
-                                DoCast(target, SPELL_GUST_OF_WIND);
+                                if (!target)
+                                    target = me->GetVictim();
+                                if (target)
+                                    DoCast(target, SPELL_GUST_OF_WIND);
                                 events.ScheduleEvent(EVENT_GUST_OF_WIND, urand(20000, 30000));
                                 break;
                             }
@@ -298,13 +304,13 @@ class boss_akilzon : public CreatureScript
                             break;
                         case EVENT_STORM_SEQUENCE:
                             {
-                                Unit* target = Unit::GetUnit(*me, CloudGUID);
+                                Unit* target = ObjectAccessor::GetUnit(*me, CloudGUID);
                                 if (!target || !target->IsAlive())
                                 {
                                     EnterEvadeMode();
                                     return;
                                 }
-                                else if (Unit* Cyclone = Unit::GetUnit(*me, CycloneGUID))
+                                else if (Unit* Cyclone = ObjectAccessor::GetUnit(*me, CycloneGUID))
                                     Cyclone->CastSpell(target, SPELL_SAND_STORM, true); // keep casting or...
                                 HandleStormSequence(target);
                                 break;
@@ -317,7 +323,7 @@ class boss_akilzon : public CreatureScript
 
                             for (uint8 i = 0; i < 8; ++i)
                             {
-                                Unit* bird = Unit::GetUnit(*me, BirdGUIDs[i]);
+                                Unit* bird = ObjectAccessor::GetUnit(*me, BirdGUIDs[i]);
                                 if (!bird) //they despawned on die
                                 {
                                     if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
@@ -360,9 +366,9 @@ class boss_akilzon : public CreatureScript
                 bool   isRaining;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
-            return new boss_akilzonAI(creature);
+            return GetInstanceAI<boss_akilzonAI>(creature);
         }
 };
 
@@ -379,7 +385,7 @@ class npc_akilzon_eagle : public CreatureScript
             bool arrived;
             uint64 TargetGUID;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 EagleSwoop_Timer = urand(5000, 10000);
                 arrived = true;
@@ -387,20 +393,20 @@ class npc_akilzon_eagle : public CreatureScript
                 me->SetDisableGravity(true);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 DoZoneInCombat();
             }
 
-            void MoveInLineOfSight(Unit* /*who*/) OVERRIDE { }
+            void MoveInLineOfSight(Unit* /*who*/) override { }
 
 
-            void MovementInform(uint32, uint32) OVERRIDE
+            void MovementInform(uint32, uint32) override
             {
                 arrived = true;
                 if (TargetGUID)
                 {
-                    if (Unit* target = Unit::GetUnit(*me, TargetGUID))
+                    if (Unit* target = ObjectAccessor::GetUnit(*me, TargetGUID))
                         DoCast(target, SPELL_EAGLE_SWOOP, true);
                     TargetGUID = 0;
                     me->SetSpeed(MOVE_RUN, 1.2f);
@@ -408,7 +414,7 @@ class npc_akilzon_eagle : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (EagleSwoop_Timer <= diff)
                     EagleSwoop_Timer = 0;
@@ -442,7 +448,7 @@ class npc_akilzon_eagle : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_akilzon_eagleAI(creature);
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -20,7 +20,6 @@
 #define TRINITYCORE_ARENATEAM_H
 
 #include "QueryResult.h"
-#include <ace/Singleton.h>
 #include <list>
 #include <map>
 
@@ -130,7 +129,7 @@ class ArenaTeam
         uint8  GetSlot() const            { return GetSlotByType(GetType()); }
         static uint8 GetSlotByType(uint32 type);
         uint64 GetCaptain() const  { return CaptainGuid; }
-        std::string const& GetName() const       { return TeamName; }
+        std::string const& GetName() const { return TeamName; }
         const ArenaTeamStats& GetStats() const { return Stats; }
 
         uint32 GetRating() const          { return Stats.Rating; }

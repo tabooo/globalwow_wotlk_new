@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -82,9 +82,9 @@ class boss_mother_shahraz : public CreatureScript
 public:
     boss_mother_shahraz() : CreatureScript("boss_mother_shahraz") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new boss_shahrazAI(creature);
+        return GetInstanceAI<boss_shahrazAI>(creature);
     }
 
     struct boss_shahrazAI : public ScriptedAI
@@ -111,10 +111,9 @@ public:
 
         bool Enraged;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
-            if (instance)
-                instance->SetBossState(DATA_MOTHER_SHAHRAZ, NOT_STARTED);
+            instance->SetBossState(DATA_MOTHER_SHAHRAZ, NOT_STARTED);
 
             for (uint8 i = 0; i<3; ++i)
                 TargetGUID[i] = 0;
@@ -134,24 +133,22 @@ public:
             Enraged = false;
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
-            if (instance)
-                instance->SetBossState(DATA_MOTHER_SHAHRAZ, IN_PROGRESS);
+            instance->SetBossState(DATA_MOTHER_SHAHRAZ, IN_PROGRESS);
 
             DoZoneInCombat();
             Talk(SAY_AGGRO);
         }
 
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* /*victim*/) override
         {
             Talk(SAY_SLAY);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (instance)
-                instance->SetBossState(DATA_MOTHER_SHAHRAZ, DONE);
+            instance->SetBossState(DATA_MOTHER_SHAHRAZ, DONE);
 
             Talk(SAY_DEATH);
         }
@@ -174,7 +171,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -248,7 +245,7 @@ public:
                     {
                         if (TargetGUID[i])
                         {
-                            if (Unit* unit = Unit::GetUnit(*me, TargetGUID[i]))
+                            if (Unit* unit = ObjectAccessor::GetUnit(*me, TargetGUID[i]))
                                 unit->CastSpell(unit, SPELL_ATTRACTION, true);
                             TargetGUID[i] = 0;
                         }

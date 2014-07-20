@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -93,7 +93,7 @@ struct npc_escortAI : public ScriptedAI
         void SetRun(bool on = true);
         void SetEscortPaused(bool on);
 
-        bool HasEscortState(uint32 escortState) { return (m_uiEscortState & escortState); }
+        bool HasEscortState(uint32 escortState) { return (m_uiEscortState & escortState) != 0; }
         virtual bool IsEscorted() { return (m_uiEscortState & STATE_ESCORT_ESCORTING); }
 
         void SetMaxPlayerDistance(float newMax) { MaxPlayerDistance = newMax; }

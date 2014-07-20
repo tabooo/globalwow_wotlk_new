@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -32,6 +32,8 @@ EndContentData */
 #include "ScriptedGossip.h"
 #include "ScriptedEscortAI.h"
 #include "Player.h"
+#include "SpellInfo.h"
+#include "SpellScript.h"
 
 /*######
 ## npc_apothecary_hanes
@@ -43,7 +45,8 @@ enum Entries
     FACTION_ESCORTEE_H           = 775,
     NPC_HANES_FIRE_TRIGGER       = 23968,
     QUEST_TRAIL_OF_FIRE          = 11241,
-    SPELL_COSMETIC_LOW_POLY_FIRE = 56274
+    SPELL_COSMETIC_LOW_POLY_FIRE = 56274,
+    SPELL_HEALING_POTION         = 17534
 };
 
 class npc_apothecary_hanes : public CreatureScript
@@ -51,7 +54,7 @@ class npc_apothecary_hanes : public CreatureScript
 public:
     npc_apothecary_hanes() : CreatureScript("npc_apothecary_hanes") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) OVERRIDE
+    bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) override
     {
         if (quest->GetQuestId() == QUEST_TRAIL_OF_FIRE)
         {
@@ -74,25 +77,25 @@ public:
         npc_Apothecary_HanesAI(Creature* creature) : npc_escortAI(creature){ }
         uint32 PotTimer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             SetDespawnAtFar(false);
             PotTimer = 10000; //10 sec cooldown on potion
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             if (Player* player = GetPlayerForEscort())
                 player->FailQuest(QUEST_TRAIL_OF_FIRE);
         }
 
-        void UpdateEscortAI(const uint32 diff) OVERRIDE
+        void UpdateEscortAI(const uint32 diff) override
         {
             if (HealthBelowPct(75))
             {
                 if (PotTimer <= diff)
                 {
-                    DoCast(me, 17534, true);
+                    DoCast(me, SPELL_HEALING_POTION, true);
                     PotTimer = 10000;
                 } else PotTimer -= diff;
             }
@@ -100,7 +103,7 @@ public:
                 DoMeleeAttackIfReady();
         }
 
-        void WaypointReached(uint32 waypointId) OVERRIDE
+        void WaypointReached(uint32 waypointId) override
         {
             Player* player = GetPlayerForEscort();
             if (!player)
@@ -150,7 +153,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_Apothecary_HanesAI(creature);
     }
@@ -174,7 +177,7 @@ public:
     {
         npc_plaguehound_trackerAI(Creature* creature) : npc_escortAI(creature) { }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             uint64 summonerGUID = 0;
 
@@ -190,7 +193,7 @@ public:
             Start(false, false, summonerGUID);
         }
 
-        void WaypointReached(uint32 waypointId) OVERRIDE
+        void WaypointReached(uint32 waypointId) override
         {
             if (waypointId != 26)
                 return;
@@ -199,7 +202,7 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_plaguehound_trackerAI(creature);
     }
@@ -228,7 +231,7 @@ class npc_razael_and_lyana : public CreatureScript
 public:
     npc_razael_and_lyana() : CreatureScript("npc_razael_and_lyana") { }
 
-    bool OnGossipHello(Player* player, Creature* creature) OVERRIDE
+    bool OnGossipHello(Player* player, Creature* creature) override
     {
         if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
@@ -257,7 +260,7 @@ public:
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) OVERRIDE
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
     {
         player->PlayerTalkClass->ClearMenus();
         switch (action)
@@ -301,7 +304,7 @@ class npc_daegarn : public CreatureScript
 public:
     npc_daegarn() : CreatureScript("npc_daegarn") { }
 
-    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest) OVERRIDE
+    bool OnQuestAccept(Player* player, Creature* creature, const Quest* quest) override
     {
         if (quest->GetQuestId() == QUEST_DEFEAT_AT_RING)
         {
@@ -320,7 +323,7 @@ public:
         bool bEventInProgress;
         uint64 uiPlayerGUID;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             bEventInProgress = false;
             uiPlayerGUID = 0;
@@ -336,7 +339,7 @@ public:
             SummonGladiator(NPC_FIRJUS);
         }
 
-        void JustSummoned(Creature* summon) OVERRIDE
+        void JustSummoned(Creature* summon) override
         {
             if (Player* player = ObjectAccessor::GetPlayer(*me, uiPlayerGUID))
             {
@@ -357,7 +360,7 @@ public:
             me->SummonCreature(uiEntry, afSummon[0], afSummon[1], afSummon[2], 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 30*IN_MILLISECONDS);
         }
 
-        void SummonedCreatureDies(Creature* summoned, Unit* /*killer*/) OVERRIDE
+        void SummonedCreatureDies(Creature* summoned, Unit* /*killer*/) override
         {
             uint32 uiEntry = 0;
 
@@ -374,16 +377,113 @@ public:
         }
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_daegarnAI(creature);
     }
 };
 
+enum MindlessAbomination
+{
+    EVENT_CHECK_CHARMED                = 1
+};
+
+class npc_mindless_abomination : public CreatureScript
+{
+public:
+    npc_mindless_abomination() : CreatureScript("npc_mindless_abomination") { }
+
+    struct npc_mindless_abominationAI : public ScriptedAI
+    {
+        npc_mindless_abominationAI(Creature* creature) : ScriptedAI(creature) { }
+
+        void Reset() override
+        {
+            events.ScheduleEvent(EVENT_CHECK_CHARMED, 1000);
+        }
+
+        void UpdateAI(uint32 diff) override
+        {
+            events.Update(diff);
+
+            while (uint32 eventId = events.ExecuteEvent())
+            {
+                switch (eventId)
+                {
+                    case EVENT_CHECK_CHARMED:
+                        if (!me->IsCharmedOwnedByPlayerOrPlayer())
+                            me->DespawnOrUnsummon();
+                        else
+                            events.ScheduleEvent(EVENT_CHECK_CHARMED, 1000);
+                        break;
+                }
+            }
+        }
+
+    private:
+        EventMap events;
+    };
+
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new npc_mindless_abominationAI(creature);
+    }
+};
+
+class spell_mindless_abomination_explosion_fx_master : public SpellScriptLoader
+{
+    enum Spells
+    {
+        SPELL_RANDOM_CIRCUMFERENCE_POINT_POISON = 42266,
+        SPELL_COSMETIC_BLOOD_EXPLOSION_GREEN_LARGE = 43401
+    };
+
+    public:
+        spell_mindless_abomination_explosion_fx_master() : SpellScriptLoader("spell_mindless_abomination_explosion_fx_master") { }
+
+        class spell_mindless_abomination_explosion_fx_master_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_mindless_abomination_explosion_fx_master_SpellScript);
+
+            bool Validate(SpellInfo const* /*spellInfo*/) override
+            {
+                if (!sSpellMgr->GetSpellInfo(SPELL_RANDOM_CIRCUMFERENCE_POINT_POISON) || !sSpellMgr->GetSpellInfo(SPELL_COSMETIC_BLOOD_EXPLOSION_GREEN_LARGE))
+                    return false;
+                return true;
+            }
+
+            void HandleScript(SpellEffIndex /*eff*/)
+            {
+                Creature* caster = GetCaster()->ToCreature();
+                if (!caster)
+                    return;
+
+                caster->CastSpell(caster, SPELL_COSMETIC_BLOOD_EXPLOSION_GREEN_LARGE);
+
+                for (uint8 i = 0; i < 10; ++i)
+                    caster->CastSpell(caster, SPELL_RANDOM_CIRCUMFERENCE_POINT_POISON);
+
+                caster->DespawnOrUnsummon(4000);
+            }
+
+            void Register() override
+            {
+                OnEffectHitTarget += SpellEffectFn(spell_mindless_abomination_explosion_fx_master_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+            }
+        };
+
+        SpellScript* GetSpellScript() const override
+        {
+            return new spell_mindless_abomination_explosion_fx_master_SpellScript();
+        }
+};
+
 void AddSC_howling_fjord()
 {
-    new npc_apothecary_hanes;
-    new npc_plaguehound_tracker;
-    new npc_razael_and_lyana;
-    new npc_daegarn;
+    new npc_apothecary_hanes();
+    new npc_plaguehound_tracker();
+    new npc_razael_and_lyana();
+    new npc_daegarn();
+    new npc_mindless_abomination();
+    new spell_mindless_abomination_explosion_fx_master();
  }

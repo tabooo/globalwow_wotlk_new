@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -84,9 +84,9 @@ class boss_hydross_the_unstable : public CreatureScript
 public:
     boss_hydross_the_unstable() : CreatureScript("boss_hydross_the_unstable") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new boss_hydross_the_unstableAI(creature);
+        return GetInstanceAI<boss_hydross_the_unstableAI>(creature);
     }
 
     struct boss_hydross_the_unstableAI : public ScriptedAI
@@ -113,7 +113,7 @@ public:
         bool beam;
         SummonList Summons;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             DeSummonBeams();
             beams[0] = 0;
@@ -134,8 +134,7 @@ public:
 
             me->SetDisplayId(MODEL_CLEAN);
 
-            if (instance)
-                instance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, NOT_STARTED);
+            instance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, NOT_STARTED);
             beam = false;
             Summons.DespawnAll();
         }
@@ -163,27 +162,26 @@ public:
         {
             for (uint8 i = 0; i < 2; ++i)
             {
-                if (Creature* mob = Unit::GetCreature(*me, beams[i]))
+                if (Creature* mob = ObjectAccessor::GetCreature(*me, beams[i]))
                 {
                     mob->setDeathState(DEAD);
                     mob->RemoveCorpse();
                 }
             }
         }
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
 
-            if (instance)
-                instance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, IN_PROGRESS);
+            instance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, IN_PROGRESS);
         }
 
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* /*victim*/) override
         {
             Talk(CorruptedForm ? SAY_CORRUPT_SLAY : SAY_CLEAN_SLAY);
         }
 
-        void JustSummoned(Creature* summoned) OVERRIDE
+        void JustSummoned(Creature* summoned) override
         {
             if (summoned->GetEntry() == ENTRY_PURE_SPAWN)
             {
@@ -199,21 +197,20 @@ public:
             }
         }
 
-        void SummonedCreatureDespawn(Creature* summon) OVERRIDE
+        void SummonedCreatureDespawn(Creature* summon) override
         {
             Summons.Despawn(summon);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(CorruptedForm ? SAY_CORRUPT_DEATH : SAY_CLEAN_DEATH);
 
-            if (instance)
-                instance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, DONE);
+            instance->SetData(DATA_HYDROSSTHEUNSTABLEEVENT, DONE);
             Summons.DespawnAll();
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!beam)
             {

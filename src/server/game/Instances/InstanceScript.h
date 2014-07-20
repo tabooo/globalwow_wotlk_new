@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -35,8 +35,8 @@ class Player;
 class GameObject;
 class Creature;
 
-typedef std::set<GameObject*> DoorSet;
-typedef std::set<Creature*> MinionSet;
+typedef std::set<uint64> DoorSet;
+typedef std::set<uint64> MinionSet;
 
 enum EncounterFrameType
 {
@@ -241,6 +241,16 @@ AI* GetInstanceAI(T* obj, char const* scriptName)
         if (instance->GetInstanceScript())
             if (instance->GetScriptId() == sObjectMgr->GetScriptId(scriptName))
                 return new AI(obj);
+
+    return NULL;
+}
+
+template<class AI, class T>
+AI* GetInstanceAI(T* obj)
+{
+    if (InstanceMap* instance = obj->GetMap()->ToInstanceMap())
+        if (instance->GetInstanceScript())
+            return new AI(obj);
 
     return NULL;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -22,25 +22,38 @@
 #include "Define.h"
 #include "Appender.h"
 #include "Logger.h"
-#include "LogWorker.h"
-#include "Dynamic/UnorderedMap.h"
+#include <stdarg.h>
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/strand.hpp>
 
+#include <unordered_map>
 #include <string>
-#include <ace/Singleton.h>
 
 #define LOGGER_ROOT "root"
 
 class Log
 {
-    friend class ACE_Singleton<Log, ACE_Thread_Mutex>;
-
-    typedef UNORDERED_MAP<std::string, Logger> LoggerMap;
+    typedef std::unordered_map<std::string, Logger> LoggerMap;
 
     private:
         Log();
         ~Log();
 
     public:
+
+        static Log* instance(boost::asio::io_service* ioService = nullptr)
+        {
+            static Log* instance = new Log();
+
+            if (ioService != nullptr)
+            {
+                instance->_ioService = ioService;
+                instance->_strand = new boost::asio::strand(*ioService);
+            }
+            
+            return instance;
+        }
+
         void LoadFromConfig();
         void Close();
         bool ShouldLog(std::string const& type, LogLevel level) const;
@@ -73,7 +86,8 @@ class Log
         std::string m_logsDir;
         std::string m_logsTimestamp;
 
-        LogWorker* worker;
+        boost::asio::io_service* _ioService;
+        boost::asio::strand* _strand;
 };
 
 inline Logger const* Log::GetLoggerByType(std::string const& type) const
@@ -117,9 +131,9 @@ inline void Log::outMessage(std::string const& filter, LogLevel level, const cha
     va_end(ap);
 }
 
-#define sLog ACE_Singleton<Log, ACE_Thread_Mutex>::instance()
+#define sLog Log::instance()
 
-#if COMPILER != COMPILER_MICROSOFT
+#if PLATFORM != PLATFORM_WINDOWS
 #define TC_LOG_MESSAGE_BODY(filterType__, level__, ...)                 \
         do {                                                            \
             if (sLog->ShouldLog(filterType__, level__))                 \

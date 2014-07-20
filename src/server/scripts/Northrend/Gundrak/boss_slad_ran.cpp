@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -74,9 +74,9 @@ class boss_slad_ran : public CreatureScript
 public:
     boss_slad_ran() : CreatureScript("boss_slad_ran") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new boss_slad_ranAI(creature);
+        return GetInstanceAI<boss_slad_ranAI>(creature);
     }
 
     struct boss_slad_ranAI : public ScriptedAI
@@ -98,7 +98,7 @@ public:
 
         InstanceScript* instance;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             uiPoisonNovaTimer = 10*IN_MILLISECONDS;
             uiPowerfullBiteTimer = 3*IN_MILLISECONDS;
@@ -109,19 +109,17 @@ public:
 
             lSummons.DespawnAll();
 
-            if (instance)
-                instance->SetData(DATA_SLAD_RAN_EVENT, NOT_STARTED);
+            instance->SetData(DATA_SLAD_RAN_EVENT, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
 
-            if (instance)
-                instance->SetData(DATA_SLAD_RAN_EVENT, IN_PROGRESS);
+            instance->SetData(DATA_SLAD_RAN_EVENT, IN_PROGRESS);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             //Return since we have no target
             if (!UpdateVictim())
@@ -175,27 +173,27 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
             lSummons.DespawnAll();
 
-            if (instance)
-                instance->SetData(DATA_SLAD_RAN_EVENT, DONE);
+            instance->SetData(DATA_SLAD_RAN_EVENT, DONE);
         }
 
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* who) override
         {
-            Talk(SAY_SLAY);
+            if (who->GetTypeId() == TYPEID_PLAYER)
+                Talk(SAY_SLAY);
         }
 
-        void JustSummoned(Creature* summoned) OVERRIDE
+        void JustSummoned(Creature* summoned) override
         {
             summoned->GetMotionMaster()->MovePoint(0, me->GetPositionX(), me->GetPositionY(), me->GetPositionZ());
             lSummons.Summon(summoned);
         }
 
-        void SetGUID(uint64 guid, int32 type) OVERRIDE
+        void SetGUID(uint64 guid, int32 type) override
         {
             if (type == DATA_SNAKES_WHYD_IT_HAVE_TO_BE_SNAKES)
                 lWrappedPlayers.insert(guid);
@@ -203,7 +201,7 @@ public:
 
         bool WasWrapped(uint64 guid)
         {
-            return lWrappedPlayers.count(guid);
+            return lWrappedPlayers.count(guid) != 0;
         }
     };
 
@@ -214,23 +212,26 @@ class npc_slad_ran_constrictor : public CreatureScript
 public:
     npc_slad_ran_constrictor() : CreatureScript("npc_slad_ran_constrictor") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_slad_ran_constrictorAI(creature);
     }
 
     struct npc_slad_ran_constrictorAI : public ScriptedAI
     {
-        npc_slad_ran_constrictorAI(Creature* creature) : ScriptedAI(creature) { }
+        npc_slad_ran_constrictorAI(Creature* creature) : ScriptedAI(creature)
+        {
+            uiGripOfSladRanTimer = 1 * IN_MILLISECONDS;
+        }
 
         uint32 uiGripOfSladRanTimer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             uiGripOfSladRanTimer = 1*IN_MILLISECONDS;
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -249,8 +250,9 @@ public:
                     target->CastSpell(target, SPELL_SNAKE_WRAP, true);
 
                     if (TempSummon* _me = me->ToTempSummon())
-                        if (Creature* sladran = _me->GetSummoner()->ToCreature())
-                            sladran->AI()->SetGUID(target->GetGUID(), DATA_SNAKES_WHYD_IT_HAVE_TO_BE_SNAKES);
+                        if (Unit* summoner = _me->GetSummoner())
+                            if (Creature* sladran = summoner->ToCreature())
+                                sladran->AI()->SetGUID(target->GetGUID(), DATA_SNAKES_WHYD_IT_HAVE_TO_BE_SNAKES);
 
                     me->DespawnOrUnsummon();
                 }
@@ -265,23 +267,26 @@ class npc_slad_ran_viper : public CreatureScript
 public:
     npc_slad_ran_viper() : CreatureScript("npc_slad_ran_viper") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_slad_ran_viperAI(creature);
     }
 
     struct npc_slad_ran_viperAI : public ScriptedAI
     {
-        npc_slad_ran_viperAI(Creature* creature) : ScriptedAI(creature) { }
+        npc_slad_ran_viperAI(Creature* creature) : ScriptedAI(creature)
+        {
+            uiVenomousBiteTimer = 2 * IN_MILLISECONDS;
+        }
 
         uint32 uiVenomousBiteTimer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             uiVenomousBiteTimer = 2*IN_MILLISECONDS;
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -303,7 +308,7 @@ class achievement_snakes_whyd_it_have_to_be_snakes : public AchievementCriteriaS
         {
         }
 
-        bool OnCheck(Player* player, Unit* target) OVERRIDE
+        bool OnCheck(Player* player, Unit* target) override
         {
             if (!target)
                 return false;

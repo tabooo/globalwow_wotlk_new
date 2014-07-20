@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -73,9 +73,9 @@ class boss_volkhan : public CreatureScript
 public:
     boss_volkhan() : CreatureScript("boss_volkhan") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new boss_volkhanAI(creature);
+        return GetInstanceAI<boss_volkhanAI>(creature);
     }
 
     struct boss_volkhanAI : public ScriptedAI
@@ -102,7 +102,7 @@ public:
 
         uint32 m_uiHealthAmountModifier;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             m_bIsStriking = false;
             m_bHasTemper = false;
@@ -120,19 +120,17 @@ public:
             DespawnGolem();
             m_lGolemGUIDList.clear();
 
-            if (instance)
-                instance->SetBossState(DATA_VOLKHAN, NOT_STARTED);
+            instance->SetBossState(DATA_VOLKHAN, NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
 
-            if (instance)
-                instance->SetBossState(DATA_VOLKHAN, IN_PROGRESS);
+            instance->SetBossState(DATA_VOLKHAN, IN_PROGRESS);
         }
 
-        void AttackStart(Unit* who) OVERRIDE
+        void AttackStart(Unit* who) override
         {
             if (me->Attack(who, true))
             {
@@ -145,18 +143,18 @@ public:
             }
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
             DespawnGolem();
 
-            if (instance)
-                instance->SetBossState(DATA_VOLKHAN, DONE);
+            instance->SetBossState(DATA_VOLKHAN, DONE);
         }
 
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* who) override
         {
-            Talk(SAY_SLAY);
+            if (who->GetTypeId() == TYPEID_PLAYER)
+                Talk(SAY_SLAY);
         }
 
         void DespawnGolem()
@@ -164,13 +162,11 @@ public:
             if (m_lGolemGUIDList.empty())
                 return;
 
-            for (std::list<uint64>::const_iterator itr = m_lGolemGUIDList.begin(); itr != m_lGolemGUIDList.end(); ++itr)
+            for (uint64 guid : m_lGolemGUIDList)
             {
-                if (Creature* temp = Unit::GetCreature(*me, *itr))
-                {
+                if (Creature* temp = ObjectAccessor::GetCreature(*me, guid))
                     if (temp->IsAlive())
                         temp->DespawnOrUnsummon();
-                }
             }
 
             m_lGolemGUIDList.clear();
@@ -181,9 +177,9 @@ public:
             if (m_lGolemGUIDList.empty())
                 return;
 
-            for (std::list<uint64>::const_iterator itr = m_lGolemGUIDList.begin(); itr != m_lGolemGUIDList.end(); ++itr)
+            for (uint64 guid : m_lGolemGUIDList)
             {
-                if (Creature* temp = Unit::GetCreature(*me, *itr))
+                if (Creature* temp = ObjectAccessor::GetCreature(*me, guid))
                 {
                     // Only shatter brittle golems
                     if (temp->IsAlive() && temp->GetEntry() == NPC_BRITTLE_GOLEM)
@@ -195,7 +191,7 @@ public:
             }
         }
 
-        void JustSummoned(Creature* summoned) OVERRIDE
+        void JustSummoned(Creature* summoned) override
         {
             if (summoned->GetEntry() == NPC_MOLTEN_GOLEM)
             {
@@ -209,7 +205,7 @@ public:
             }
         }
 
-        void JustReachedHome() OVERRIDE
+        void JustReachedHome() override
         {
             if (m_uiSummonPhase == 2)
             {
@@ -218,7 +214,7 @@ public:
             }
         }
 
-        uint32 GetData(uint32 data) const OVERRIDE
+        uint32 GetData(uint32 data) const override
         {
             if (data == DATA_SHATTER_RESISTANT)
                 return GolemsShattered;
@@ -226,7 +222,7 @@ public:
             return 0;
         }
 
-        void UpdateAI(uint32 uiDiff) OVERRIDE
+        void UpdateAI(uint32 uiDiff) override
         {
             if (!UpdateVictim())
                 return;
@@ -286,7 +282,7 @@ public:
             {
                 ++m_uiHealthAmountModifier;
 
-                if (me->IsNonMeleeSpellCasted(false))
+                if (me->IsNonMeleeSpellCast(false))
                     me->InterruptNonMeleeSpells(false);
 
                 Talk(SAY_FORGE);
@@ -307,7 +303,7 @@ public:
 
                 case 2:
                     // 2 - Check if reached Anvil
-                    // This is handled in: void JustReachedHome() OVERRIDE
+                    // This is handled in: void JustReachedHome() override
                     break;
 
                 case 3:
@@ -363,7 +359,7 @@ class npc_molten_golem : public CreatureScript
 public:
     npc_molten_golem() : CreatureScript("npc_molten_golem") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_molten_golemAI(creature);
     }
@@ -378,7 +374,7 @@ public:
         uint32 m_uiDeathDelay_Timer;
         uint32 m_uiImmolation_Timer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             m_bIsFrozen = false;
 
@@ -387,7 +383,7 @@ public:
             m_uiImmolation_Timer = 5000;
         }
 
-        void AttackStart(Unit* who) OVERRIDE
+        void AttackStart(Unit* who) override
         {
             if (me->Attack(who, true))
             {
@@ -400,7 +396,7 @@ public:
             }
         }
 
-        void DamageTaken(Unit* /*pDoneBy*/, uint32 &uiDamage) OVERRIDE
+        void DamageTaken(Unit* /*pDoneBy*/, uint32 &uiDamage) override
         {
             if (uiDamage > me->GetHealth())
             {
@@ -411,7 +407,7 @@ public:
                 me->AttackStop();
                 // me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_STUNNED);  //Set in DB
                 // me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE); //Set in DB
-                if (me->IsNonMeleeSpellCasted(false))
+                if (me->IsNonMeleeSpellCast(false))
                     me->InterruptNonMeleeSpells(false);
                 if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
                     me->GetMotionMaster()->MovementExpired();
@@ -419,7 +415,7 @@ public:
             }
         }
 
-        void SpellHit(Unit* /*pCaster*/, const SpellInfo* pSpell) OVERRIDE
+        void SpellHit(Unit* /*pCaster*/, const SpellInfo* pSpell) override
         {
             // This is the dummy effect of the spells
             if (pSpell->Id == SPELL_SHATTER_N || pSpell->Id == SPELL_SHATTER_H)
@@ -427,7 +423,7 @@ public:
                     me->DespawnOrUnsummon();
         }
 
-        void UpdateAI(uint32 uiDiff) OVERRIDE
+        void UpdateAI(uint32 uiDiff) override
         {
             // Return since we have no target or if we are frozen
             if (!UpdateVictim() || m_bIsFrozen)
@@ -459,7 +455,7 @@ class achievement_shatter_resistant : public AchievementCriteriaScript
     public:
         achievement_shatter_resistant() : AchievementCriteriaScript("achievement_shatter_resistant") { }
 
-        bool OnCheck(Player* /*source*/, Unit* target) OVERRIDE
+        bool OnCheck(Player* /*source*/, Unit* target) override
         {
             return target && target->GetAI()->GetData(DATA_SHATTER_RESISTANT) < 5;
         }

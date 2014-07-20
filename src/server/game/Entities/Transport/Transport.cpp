@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -31,9 +31,11 @@
 #include "Player.h"
 #include "Cell.h"
 #include "CellImpl.h"
+#include "Totem.h"
 
 Transport::Transport() : GameObject(),
-    _transportInfo(NULL), _isMoving(true), _pendingStop(false)
+    _transportInfo(NULL), _isMoving(true), _pendingStop(false),
+    _triggeredArrivalEvent(false), _triggeredDepartureEvent(false), _passengerTeleportItr(_passengers.begin())
 {
     m_updateFlag = UPDATEFLAG_TRANSPORT | UPDATEFLAG_LOWGUID | UPDATEFLAG_STATIONARY_POSITION | UPDATEFLAG_ROTATION;
 }
@@ -83,19 +85,32 @@ bool Transport::Create(uint32 guidlow, uint32 entry, uint32 mapid, float x, floa
     _triggeredDepartureEvent = false;
 
     m_goValue.Transport.PathProgress = 0;
-    SetFloatValue(OBJECT_FIELD_SCALE_X, goinfo->size);
-    SetUInt32Value(GAMEOBJECT_FACTION, goinfo->faction);
+    SetObjectScale(goinfo->size);
+    SetFaction(goinfo->faction);
     SetUInt32Value(GAMEOBJECT_FLAGS, goinfo->flags);
     SetPeriod(tInfo->pathTime);
     SetEntry(goinfo->entry);
     SetDisplayId(goinfo->displayId);
-    SetGoState(GO_STATE_READY);
-    _pendingStop = goinfo->moTransport.canBeStopped != 0;
+    SetGoState(!goinfo->moTransport.canBeStopped ? GO_STATE_READY : GO_STATE_ACTIVE);
     SetGoType(GAMEOBJECT_TYPE_MO_TRANSPORT);
     SetGoAnimProgress(animprogress);
     SetName(goinfo->name);
     UpdateRotationFields(0.0f, 1.0f);
+
+    m_model = GameObjectModel::Create(*this);
     return true;
+}
+
+void Transport::CleanupsBeforeDelete(bool finalCleanup /*= true*/)
+{
+    UnloadStaticPassengers();
+    while (!_passengers.empty())
+    {
+        WorldObject* obj = *_passengers.begin();
+        RemovePassenger(obj);
+    }
+
+    GameObject::CleanupsBeforeDelete(finalCleanup);
 }
 
 void Transport::Update(uint32 diff)
@@ -110,7 +125,8 @@ void Transport::Update(uint32 diff)
     if (GetKeyFrames().size() <= 1)
         return;
 
-    m_goValue.Transport.PathProgress += diff;
+    if (IsMoving() || !_pendingStop)
+        m_goValue.Transport.PathProgress += diff;
 
     uint32 timer = m_goValue.Transport.PathProgress % GetPeriod();
 
@@ -131,18 +147,15 @@ void Transport::Update(uint32 diff)
             if (timer < _currentFrame->DepartureTime)
             {
                 SetMoving(false);
-                if (_pendingStop)
+                if (_pendingStop && GetGoState() != GO_STATE_READY)
+                {
                     SetGoState(GO_STATE_READY);
+                    m_goValue.Transport.PathProgress = (m_goValue.Transport.PathProgress / GetPeriod());
+                    m_goValue.Transport.PathProgress *= GetPeriod();
+                    m_goValue.Transport.PathProgress += _currentFrame->ArriveTime;
+                }
                 break;  // its a stop frame and we are waiting
             }
-        }
-
-        if (_pendingStop && timer >= _currentFrame->DepartureTime && GetGoState() == GO_STATE_READY)
-        {
-            m_goValue.Transport.PathProgress = (m_goValue.Transport.PathProgress / GetPeriod());
-            m_goValue.Transport.PathProgress *= GetPeriod();
-            m_goValue.Transport.PathProgress += _currentFrame->ArriveTime;
-            break;
         }
 
         if (timer >= _currentFrame->DepartureTime && !_triggeredDepartureEvent)
@@ -151,11 +164,6 @@ void Transport::Update(uint32 diff)
             _triggeredDepartureEvent = true;
         }
 
-        if (timer >= _currentFrame->DepartureTime && timer < _currentFrame->NextArriveTime)
-            break;  // found current waypoint
-
-        MoveToNextWaypoint();
-
         // not waiting anymore
         SetMoving(true);
 
@@ -163,13 +171,18 @@ void Transport::Update(uint32 diff)
         if (GetGOInfo()->moTransport.canBeStopped)
             SetGoState(GO_STATE_ACTIVE);
 
+        if (timer >= _currentFrame->DepartureTime && timer < _currentFrame->NextArriveTime)
+            break;  // found current waypoint
+
+        MoveToNextWaypoint();
+
         sScriptMgr->OnRelocate(this, _currentFrame->Node->index, _currentFrame->Node->mapid, _currentFrame->Node->x, _currentFrame->Node->y, _currentFrame->Node->z);
 
         TC_LOG_DEBUG("entities.transport", "Transport %u (%s) moved to node %u %u %f %f %f", GetEntry(), GetName().c_str(), _currentFrame->Node->index, _currentFrame->Node->mapid, _currentFrame->Node->x, _currentFrame->Node->y, _currentFrame->Node->z);
 
         // Departure event
         if (_currentFrame->IsTeleportFrame())
-            if (TeleportTransport(_nextFrame->Node->mapid, _nextFrame->Node->x, _nextFrame->Node->y, _nextFrame->Node->z))
+            if (TeleportTransport(_nextFrame->Node->mapid, _nextFrame->Node->x, _nextFrame->Node->y, _nextFrame->Node->z, _nextFrame->InitialOrientation))
                 return; // Update more in new map thread
     }
 
@@ -184,7 +197,24 @@ void Transport::Update(uint32 diff)
             G3D::Vector3 pos, dir;
             _currentFrame->Spline->evaluate_percent(_currentFrame->Index, t, pos);
             _currentFrame->Spline->evaluate_derivative(_currentFrame->Index, t, dir);
-            UpdatePosition(pos.x, pos.y, pos.z, atan2(dir.x, dir.y));
+            UpdatePosition(pos.x, pos.y, pos.z, atan2(dir.y, dir.x) + M_PI);
+        }
+        else
+        {
+            /* There are four possible scenarios that trigger loading/unloading passengers:
+              1. transport moves from inactive to active grid
+              2. the grid that transport is currently in becomes active
+              3. transport moves from active to inactive grid
+              4. the grid that transport is currently in unloads
+            */
+            bool gridActive = GetMap()->IsGridLoaded(GetPositionX(), GetPositionY());
+
+            if (_staticPassengers.empty() && gridActive) // 2.
+                LoadStaticPassengers();
+            else if (!_staticPassengers.empty() && !gridActive)
+                // 4. - if transports stopped on grid edge, some passengers can remain in active grids
+                //      unload all static passengers otherwise passengers won't load correctly when the grid that transport is currently in becomes active
+                UnloadStaticPassengers();
         }
     }
 
@@ -193,8 +223,14 @@ void Transport::Update(uint32 diff)
 
 void Transport::AddPassenger(WorldObject* passenger)
 {
+    if (!IsInWorld())
+        return;
+
     if (_passengers.insert(passenger).second)
     {
+        passenger->SetTransport(this);
+        passenger->m_movementInfo.AddMovementFlag(MOVEMENTFLAG_ONTRANSPORT);
+        passenger->m_movementInfo.transport.guid = GetGUID();
         TC_LOG_DEBUG("entities.transport", "Object %s boarded transport %s.", passenger->GetName().c_str(), GetName().c_str());
 
         if (Player* plr = passenger->ToPlayer())
@@ -204,8 +240,27 @@ void Transport::AddPassenger(WorldObject* passenger)
 
 void Transport::RemovePassenger(WorldObject* passenger)
 {
-    if (_passengers.erase(passenger) || _staticPassengers.erase(passenger)) // static passenger can remove itself in case of grid unload
+    bool erased = false;
+    if (_passengerTeleportItr != _passengers.end())
     {
+        PassengerSet::iterator itr = _passengers.find(passenger);
+        if (itr != _passengers.end())
+        {
+            if (itr == _passengerTeleportItr)
+                ++_passengerTeleportItr;
+
+            _passengers.erase(itr);
+            erased = true;
+        }
+    }
+    else
+        erased = _passengers.erase(passenger) > 0;
+
+    if (erased || _staticPassengers.erase(passenger)) // static passenger can remove itself in case of grid unload
+    {
+        passenger->SetTransport(NULL);
+        passenger->m_movementInfo.RemoveMovementFlag(MOVEMENTFLAG_ONTRANSPORT);
+        passenger->m_movementInfo.transport.Reset();
         TC_LOG_DEBUG("entities.transport", "Object %s removed from transport %s.", passenger->GetName().c_str(), GetName().c_str());
 
         if (Player* plr = passenger->ToPlayer())
@@ -299,11 +354,131 @@ GameObject* Transport::CreateGOPassenger(uint32 guid, GameObjectData const* data
     return go;
 }
 
+TempSummon* Transport::SummonPassenger(uint32 entry, Position const& pos, TempSummonType summonType, SummonPropertiesEntry const* properties /*= NULL*/, uint32 duration /*= 0*/, Unit* summoner /*= NULL*/, uint32 spellId /*= 0*/, uint32 vehId /*= 0*/)
+{
+    Map* map = FindMap();
+    if (!map)
+        return NULL;
+
+    uint32 mask = UNIT_MASK_SUMMON;
+    if (properties)
+    {
+        switch (properties->Category)
+        {
+            case SUMMON_CATEGORY_PET:
+                mask = UNIT_MASK_GUARDIAN;
+                break;
+            case SUMMON_CATEGORY_PUPPET:
+                mask = UNIT_MASK_PUPPET;
+                break;
+            case SUMMON_CATEGORY_VEHICLE:
+                mask = UNIT_MASK_MINION;
+                break;
+            case SUMMON_CATEGORY_WILD:
+            case SUMMON_CATEGORY_ALLY:
+            case SUMMON_CATEGORY_UNK:
+            {
+                switch (properties->Type)
+                {
+                    case SUMMON_TYPE_MINION:
+                    case SUMMON_TYPE_GUARDIAN:
+                    case SUMMON_TYPE_GUARDIAN2:
+                        mask = UNIT_MASK_GUARDIAN;
+                        break;
+                    case SUMMON_TYPE_TOTEM:
+                    case SUMMON_TYPE_LIGHTWELL:
+                        mask = UNIT_MASK_TOTEM;
+                        break;
+                    case SUMMON_TYPE_VEHICLE:
+                    case SUMMON_TYPE_VEHICLE2:
+                        mask = UNIT_MASK_SUMMON;
+                        break;
+                    case SUMMON_TYPE_MINIPET:
+                        mask = UNIT_MASK_MINION;
+                        break;
+                    default:
+                        if (properties->Flags & 512) // Mirror Image, Summon Gargoyle
+                            mask = UNIT_MASK_GUARDIAN;
+                        break;
+                }
+                break;
+            }
+            default:
+                return NULL;
+        }
+    }
+
+    uint32 phase = PHASEMASK_NORMAL;
+    if (summoner)
+        phase = summoner->GetPhaseMask();
+
+    TempSummon* summon = NULL;
+    switch (mask)
+    {
+        case UNIT_MASK_SUMMON:
+            summon = new TempSummon(properties, summoner, false);
+            break;
+        case UNIT_MASK_GUARDIAN:
+            summon = new Guardian(properties, summoner, false);
+            break;
+        case UNIT_MASK_PUPPET:
+            summon = new Puppet(properties, summoner);
+            break;
+        case UNIT_MASK_TOTEM:
+            summon = new Totem(properties, summoner);
+            break;
+        case UNIT_MASK_MINION:
+            summon = new Minion(properties, summoner, false);
+            break;
+    }
+
+    float x, y, z, o;
+    pos.GetPosition(x, y, z, o);
+    CalculatePassengerPosition(x, y, z, &o);
+
+    if (!summon->Create(sObjectMgr->GenerateLowGuid(HIGHGUID_UNIT), map, phase, entry, x, y, z, o, nullptr, vehId))
+    {
+        delete summon;
+        return NULL;
+    }
+
+    summon->SetUInt32Value(UNIT_CREATED_BY_SPELL, spellId);
+
+    summon->SetTransport(this);
+    summon->AddUnitMovementFlag(MOVEMENTFLAG_ONTRANSPORT);
+    summon->m_movementInfo.transport.guid = GetGUID();
+    summon->m_movementInfo.transport.pos.Relocate(pos);
+    summon->Relocate(x, y, z, o);
+    summon->SetHomePosition(x, y, z, o);
+    summon->SetTransportHomePosition(pos);
+
+    /// @HACK - transport models are not added to map's dynamic LoS calculations
+    ///         because the current GameObjectModel cannot be moved without recreating
+    summon->AddUnitState(UNIT_STATE_IGNORE_PATHFINDING);
+
+    summon->InitStats(duration);
+
+    if (!map->AddToMap<Creature>(summon))
+    {
+        delete summon;
+        return NULL;
+    }
+
+    _staticPassengers.insert(summon);
+
+    summon->InitSummon();
+    summon->SetTempSummonType(summonType);
+
+    return summon;
+}
+
 void Transport::UpdatePosition(float x, float y, float z, float o)
 {
     bool newActive = GetMap()->IsGridLoaded(x, y);
+    Cell oldCell(GetPositionX(), GetPositionY());
 
     Relocate(x, y, z, o);
+    UpdateModelPosition();
 
     UpdatePassengerPositions(_passengers);
 
@@ -313,9 +488,9 @@ void Transport::UpdatePosition(float x, float y, float z, float o)
       3. transport moves from active to inactive grid
       4. the grid that transport is currently in unloads
     */
-    if (_staticPassengers.empty() && newActive) // 1. and 2.
+    if (_staticPassengers.empty() && newActive) // 1.
         LoadStaticPassengers();
-    else if (!_staticPassengers.empty() && !newActive && Cell(x, y).DiffGrid(Cell(GetPositionX(), GetPositionY()))) // 3.
+    else if (!_staticPassengers.empty() && !newActive && oldCell.DiffGrid(Cell(GetPositionX(), GetPositionY()))) // 3.
         UnloadStaticPassengers();
     else
         UpdatePassengerPositions(_staticPassengers);
@@ -403,52 +578,24 @@ float Transport::CalculateSegmentPos(float now)
     return segmentPos / frame.NextDistFromPrev;
 }
 
-bool Transport::TeleportTransport(uint32 newMapid, float x, float y, float z)
+bool Transport::TeleportTransport(uint32 newMapid, float x, float y, float z, float o)
 {
     Map const* oldMap = GetMap();
 
     if (oldMap->GetId() != newMapid)
     {
         Map* newMap = sMapMgr->CreateBaseMap(newMapid);
-        Map::PlayerList const& oldPlayers = GetMap()->GetPlayers();
-        if (!oldPlayers.isEmpty())
-        {
-            UpdateData data;
-            BuildOutOfRangeUpdateBlock(&data);
-            WorldPacket packet;
-            data.BuildPacket(&packet);
-            for (Map::PlayerList::const_iterator itr = oldPlayers.begin(); itr != oldPlayers.end(); ++itr)
-                if (itr->GetSource()->GetTransport() != this)
-                    itr->GetSource()->SendDirectMessage(&packet);
-        }
-
         UnloadStaticPassengers();
         GetMap()->RemoveFromMap<Transport>(this, false);
         SetMap(newMap);
 
-        Map::PlayerList const& newPlayers = GetMap()->GetPlayers();
-        if (!newPlayers.isEmpty())
+        for (_passengerTeleportItr = _passengers.begin(); _passengerTeleportItr != _passengers.end();)
         {
-            for (Map::PlayerList::const_iterator itr = newPlayers.begin(); itr != newPlayers.end(); ++itr)
-            {
-                if (itr->GetSource()->GetTransport() != this)
-                {
-                    UpdateData data;
-                    BuildCreateUpdateBlockForPlayer(&data, itr->GetSource());
-                    WorldPacket packet;
-                    data.BuildPacket(&packet);
-                    itr->GetSource()->SendDirectMessage(&packet);
-                }
-            }
-        }
-
-        for (std::set<WorldObject*>::iterator itr = _passengers.begin(); itr != _passengers.end();)
-        {
-            WorldObject* obj = (*itr++);
+            WorldObject* obj = (*_passengerTeleportItr++);
 
             float destX, destY, destZ, destO;
             obj->m_movementInfo.transport.pos.GetPosition(destX, destY, destZ, destO);
-            TransportBase::CalculatePassengerPosition(destX, destY, destZ, &destO, x, y, z, GetOrientation());
+            TransportBase::CalculatePassengerPosition(destX, destY, destZ, &destO, x, y, z, o);
 
             switch (obj->GetTypeId())
             {
@@ -467,40 +614,44 @@ bool Transport::TeleportTransport(uint32 newMapid, float x, float y, float z)
                 }
                 case TYPEID_PLAYER:
                     if (!obj->ToPlayer()->TeleportTo(newMapid, destX, destY, destZ, destO, TELE_TO_NOT_LEAVE_TRANSPORT))
-                        _passengers.erase(obj);
+                        RemovePassenger(obj);
+                    break;
+                case TYPEID_DYNAMICOBJECT:
+                    obj->AddObjectToRemoveList();
                     break;
                 default:
                     break;
             }
         }
 
-        Relocate(x, y, z, GetOrientation());
+        Relocate(x, y, z, o);
+        UpdateModelPosition();
         GetMap()->AddToMap<Transport>(this);
         return true;
     }
     else
     {
         // Teleport players, they need to know it
-        for (std::set<WorldObject*>::iterator itr = _passengers.begin(); itr != _passengers.end(); ++itr)
+        for (PassengerSet::iterator itr = _passengers.begin(); itr != _passengers.end(); ++itr)
         {
             if ((*itr)->GetTypeId() == TYPEID_PLAYER)
             {
                 float destX, destY, destZ, destO;
                 (*itr)->m_movementInfo.transport.pos.GetPosition(destX, destY, destZ, destO);
-                TransportBase::CalculatePassengerPosition(destX, destY, destZ, &destO, x, y, z, GetOrientation());
+                TransportBase::CalculatePassengerPosition(destX, destY, destZ, &destO, x, y, z, o);
 
                 (*itr)->ToUnit()->NearTeleportTo(destX, destY, destZ, destO);
             }
         }
 
-        UpdatePosition(x, y, z, GetOrientation());
+        UpdatePosition(x, y, z, o);
         return false;
     }
 }
 
-void Transport::UpdatePassengerPositions(std::set<WorldObject*>& passengers)
+void Transport::UpdatePassengerPositions(PassengerSet& passengers)
 {
-    for (std::set<WorldObject*>::iterator itr = passengers.begin(); itr != passengers.end(); ++itr)
+    for (PassengerSet::iterator itr = passengers.begin(); itr != passengers.end(); ++itr)
     {
         WorldObject* passenger = *itr;
         // transport teleported but passenger not yet (can happen for players)
@@ -536,6 +687,9 @@ void Transport::UpdatePassengerPositions(std::set<WorldObject*>& passengers)
                 break;
             case TYPEID_GAMEOBJECT:
                 GetMap()->GameObjectRelocation(passenger->ToGameObject(), x, y, z, o, false);
+                break;
+            case TYPEID_DYNAMICOBJECT:
+                GetMap()->DynamicObjectRelocation(passenger->ToDynObject(), x, y, z, o);
                 break;
             default:
                 break;

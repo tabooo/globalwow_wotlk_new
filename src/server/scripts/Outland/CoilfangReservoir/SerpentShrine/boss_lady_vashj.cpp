@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -138,9 +138,9 @@ class boss_lady_vashj : public CreatureScript
 public:
     boss_lady_vashj() : CreatureScript("boss_lady_vashj") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new boss_lady_vashjAI(creature);
+        return GetInstanceAI<boss_lady_vashjAI>(creature);
     }
 
     struct boss_lady_vashjAI : public ScriptedAI
@@ -179,7 +179,7 @@ public:
         bool CanAttack;
         bool JustCreated;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             AggroTimer = 19000;
             ShockBlastTimer = 1+rand()%60000;
@@ -207,7 +207,7 @@ public:
             {
                 if (ShieldGeneratorChannel[i])
                 {
-                    if (Unit* remo = Unit::GetUnit(*me, ShieldGeneratorChannel[i]))
+                    if (Unit* remo = ObjectAccessor::GetUnit(*me, ShieldGeneratorChannel[i]))
                     {
                         remo->setDeathState(JUST_DIED);
                         ShieldGeneratorChannel[i] = 0;
@@ -215,8 +215,7 @@ public:
                 }
             }
 
-            if (instance)
-                instance->SetData(DATA_LADYVASHJEVENT, NOT_STARTED);
+            instance->SetData(DATA_LADYVASHJEVENT, NOT_STARTED);
 
             me->SetCorpseDelay(1000*60*60);
         }
@@ -228,17 +227,16 @@ public:
             if (TaintedElementalTimer > 50000)
                 TaintedElementalTimer = 50000;
         }
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* /*victim*/) override
         {
             Talk(SAY_SLAY);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
 
-            if (instance)
-                instance->SetData(DATA_LADYVASHJEVENT, DONE);
+            instance->SetData(DATA_LADYVASHJEVENT, DONE);
         }
 
         void StartEvent()
@@ -247,28 +245,24 @@ public:
 
             Phase = 1;
 
-            if (instance)
-                instance->SetData(DATA_LADYVASHJEVENT, IN_PROGRESS);
+            instance->SetData(DATA_LADYVASHJEVENT, IN_PROGRESS);
         }
 
-        void EnterCombat(Unit* who) OVERRIDE
+        void EnterCombat(Unit* who) override
         {
-            if (instance)
-            {
-                // remove old tainted cores to prevent cheating in phase 2
-                Map* map = me->GetMap();
-                Map::PlayerList const &PlayerList = map->GetPlayers();
-                for (Map::PlayerList::const_iterator itr = PlayerList.begin(); itr != PlayerList.end(); ++itr)
-                    if (Player* player = itr->GetSource())
-                        player->DestroyItemCount(31088, 1, true);
-            }
+            // remove old tainted cores to prevent cheating in phase 2
+            Map* map = me->GetMap();
+            Map::PlayerList const &PlayerList = map->GetPlayers();
+            for (Map::PlayerList::const_iterator itr = PlayerList.begin(); itr != PlayerList.end(); ++itr)
+                if (Player* player = itr->GetSource())
+                    player->DestroyItemCount(31088, 1, true);
             StartEvent(); // this is EnterCombat(), so were are 100% in combat, start the event
 
             if (Phase != 2)
                 AttackStart(who);
         }
 
-        void MoveInLineOfSight(Unit* who) OVERRIDE
+        void MoveInLineOfSight(Unit* who) override
 
         {
             if (!Intro)
@@ -316,7 +310,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!CanAttack && Intro)
             {
@@ -437,7 +431,7 @@ public:
                     std::list<HostileReference*> t_list = me->getThreatManager().getThreatList();
                     for (std::list<HostileReference*>::const_iterator itr = t_list.begin(); itr!= t_list.end(); ++itr)
                     {
-                        Unit* target = Unit::GetUnit(*me, (*itr)->getUnitGuid());
+                        Unit* target = ObjectAccessor::GetUnit(*me, (*itr)->getUnitGuid());
                         if (target && target->IsWithinDistInMap(me, 5)) // if in melee range
                         {
                             inMeleeRange = true;
@@ -525,7 +519,7 @@ public:
                 if (CheckTimer <= diff)
                 {
                     // Start Phase 3
-                    if (instance && instance->GetData(DATA_CANSTARTPHASE3))
+                    if (instance->GetData(DATA_CANSTARTPHASE3))
                     {
                         // set life 50%
                         me->SetHealth(me->CountPctFromMaxHealth(50));
@@ -554,9 +548,9 @@ class npc_enchanted_elemental : public CreatureScript
 public:
     npc_enchanted_elemental() : CreatureScript("npc_enchanted_elemental") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new npc_enchanted_elementalAI(creature);
+        return GetInstanceAI<npc_enchanted_elementalAI>(creature);
     }
 
     struct npc_enchanted_elementalAI : public ScriptedAI
@@ -573,14 +567,12 @@ public:
 
         uint64 VashjGUID;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             me->SetSpeed(MOVE_WALK, 0.6f); // walk
             me->SetSpeed(MOVE_RUN, 0.6f); // run
             Move = 0;
             Phase = 1;
-
-            VashjGUID = 0;
 
             X = ElementWPPos[0][0];
             Y = ElementWPPos[0][1];
@@ -597,20 +589,16 @@ public:
                 }
             }
 
-            if (instance)
-                VashjGUID = instance->GetData64(DATA_LADYVASHJ);
+            VashjGUID = instance->GetData64(DATA_LADYVASHJ);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE { }
+        void EnterCombat(Unit* /*who*/) override { }
 
-        void MoveInLineOfSight(Unit* /*who*/) OVERRIDE { }
+        void MoveInLineOfSight(Unit* /*who*/) override { }
 
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
-            if (!instance)
-                return;
-
             if (!VashjGUID)
                 return;
 
@@ -632,7 +620,7 @@ public:
                     if (me->IsWithinDist3d(MIDDLE_X, MIDDLE_Y, MIDDLE_Z, 3))
                         DoCast(me, SPELL_SURGE);
                 }
-                if (Creature* vashj = Unit::GetCreature(*me, VashjGUID))
+                if (Creature* vashj = ObjectAccessor::GetCreature(*me, VashjGUID))
                     if (!vashj->IsInCombat() || CAST_AI(boss_lady_vashj::boss_lady_vashjAI, vashj->AI())->Phase != 2 || vashj->isDead())
                         me->Kill(me);
                 Move = 1000;
@@ -649,9 +637,9 @@ class npc_tainted_elemental : public CreatureScript
 public:
     npc_tainted_elemental() : CreatureScript("npc_tainted_elemental") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new npc_tainted_elementalAI(creature);
+        return GetInstanceAI<npc_tainted_elementalAI>(creature);
     }
 
     struct npc_tainted_elementalAI : public ScriptedAI
@@ -666,25 +654,24 @@ public:
         uint32 PoisonBoltTimer;
         uint32 DespawnTimer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             PoisonBoltTimer = 5000+rand()%5000;
             DespawnTimer = 30000;
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (instance)
-                if (Creature* vashj = Unit::GetCreature((*me), instance->GetData64(DATA_LADYVASHJ)))
-                    CAST_AI(boss_lady_vashj::boss_lady_vashjAI, vashj->AI())->EventTaintedElementalDeath();
+            if (Creature* vashj = ObjectAccessor::GetCreature((*me), instance->GetData64(DATA_LADYVASHJ)))
+                CAST_AI(boss_lady_vashj::boss_lady_vashjAI, vashj->AI())->EventTaintedElementalDeath();
         }
 
-        void EnterCombat(Unit* who) OVERRIDE
+        void EnterCombat(Unit* who) override
         {
             me->AddThreat(who, 0.1f);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             // PoisonBoltTimer
             if (PoisonBoltTimer <= diff)
@@ -718,9 +705,9 @@ class npc_toxic_sporebat : public CreatureScript
 public:
     npc_toxic_sporebat() : CreatureScript("npc_toxic_sporebat") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new npc_toxic_sporebatAI(creature);
+        return GetInstanceAI<npc_toxic_sporebatAI>(creature);
     }
 
     struct npc_toxic_sporebatAI : public ScriptedAI
@@ -738,7 +725,7 @@ public:
         uint32 BoltTimer;
         uint32 CheckTimer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             me->SetDisableGravity(true);
             me->setFaction(14);
@@ -748,12 +735,12 @@ public:
             CheckTimer = 1000;
         }
 
-        void MoveInLineOfSight(Unit* /*who*/) OVERRIDE
+        void MoveInLineOfSight(Unit* /*who*/) override
 
         {
         }
 
-        void MovementInform(uint32 type, uint32 id) OVERRIDE
+        void MovementInform(uint32 type, uint32 id) override
         {
             if (type != POINT_MOTION_TYPE)
                 return;
@@ -762,7 +749,7 @@ public:
                 MovementTimer = 0;
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             // Random movement
             if (MovementTimer <= diff)
@@ -790,17 +777,14 @@ public:
             // CheckTimer
             if (CheckTimer <= diff)
             {
-                if (instance)
+                // check if vashj is death
+                Unit* Vashj = ObjectAccessor::GetUnit(*me, instance->GetData64(DATA_LADYVASHJ));
+                if (!Vashj || !Vashj->IsAlive() || CAST_AI(boss_lady_vashj::boss_lady_vashjAI, Vashj->ToCreature()->AI())->Phase != 3)
                 {
-                    // check if vashj is death
-                    Unit* Vashj = Unit::GetUnit(*me, instance->GetData64(DATA_LADYVASHJ));
-                    if (!Vashj || !Vashj->IsAlive() || CAST_AI(boss_lady_vashj::boss_lady_vashjAI, Vashj->ToCreature()->AI())->Phase != 3)
-                    {
-                        // remove
-                        me->setDeathState(DEAD);
-                        me->RemoveCorpse();
-                        me->setFaction(35);
-                    }
+                    // remove
+                    me->setDeathState(DEAD);
+                    me->RemoveCorpse();
+                    me->setFaction(35);
                 }
 
                 CheckTimer = 1000;
@@ -817,9 +801,9 @@ class npc_shield_generator_channel : public CreatureScript
 public:
     npc_shield_generator_channel() : CreatureScript("npc_shield_generator_channel") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new npc_shield_generator_channelAI(creature);
+        return GetInstanceAI<npc_shield_generator_channelAI>(creature);
     }
 
     struct npc_shield_generator_channelAI : public ScriptedAI
@@ -831,36 +815,33 @@ public:
 
         InstanceScript* instance;
         uint32 CheckTimer;
-        bool Casted;
+        bool Cast;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             CheckTimer = 0;
-            Casted = false;
+            Cast = false;
             me->SetDisplayId(11686); // invisible
 
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
         }
 
-        void MoveInLineOfSight(Unit* /*who*/) OVERRIDE { }
+        void MoveInLineOfSight(Unit* /*who*/) override { }
 
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
-            if (!instance)
-                return;
-
             if (CheckTimer <= diff)
             {
-                Unit* vashj = Unit::GetUnit(*me, instance->GetData64(DATA_LADYVASHJ));
+                Unit* vashj = ObjectAccessor::GetUnit(*me, instance->GetData64(DATA_LADYVASHJ));
 
                 if (vashj && vashj->IsAlive())
                 {
                     // start visual channel
-                    if (!Casted || !vashj->HasAura(SPELL_MAGIC_BARRIER))
+                    if (!Cast || !vashj->HasAura(SPELL_MAGIC_BARRIER))
                     {
                         DoCast(vashj, SPELL_MAGIC_BARRIER, true);
-                        Casted = true;
+                        Cast = true;
                     }
                 }
                 CheckTimer = 1000;
@@ -875,7 +856,7 @@ class item_tainted_core : public ItemScript
 public:
     item_tainted_core() : ItemScript("item_tainted_core") { }
 
-    bool OnUse(Player* player, Item* /*item*/, SpellCastTargets const& targets) OVERRIDE
+    bool OnUse(Player* player, Item* /*item*/, SpellCastTargets const& targets) override
     {
         InstanceScript* instance = player->GetInstanceScript();
         if (!instance)
@@ -884,7 +865,7 @@ public:
             return true;
         }
 
-        Creature* vashj = Unit::GetCreature((*player), instance->GetData64(DATA_LADYVASHJ));
+        Creature* vashj = ObjectAccessor::GetCreature((*player), instance->GetData64(DATA_LADYVASHJ));
         if (vashj && (CAST_AI(boss_lady_vashj::boss_lady_vashjAI, vashj->AI())->Phase == 2))
         {
             if (GameObject* gObj = targets.GetGOTarget())
@@ -920,7 +901,7 @@ public:
                 }
 
                 // get and remove channel
-                if (Unit* channel = Unit::GetCreature(*vashj, CAST_AI(boss_lady_vashj::boss_lady_vashjAI, vashj->AI())->ShieldGeneratorChannel[channelIdentifier]))
+                if (Unit* channel = ObjectAccessor::GetCreature(*vashj, CAST_AI(boss_lady_vashj::boss_lady_vashjAI, vashj->AI())->ShieldGeneratorChannel[channelIdentifier]))
                     channel->setDeathState(JUST_DIED); // call Unsummon()
 
                 instance->SetData(identifier, 1);

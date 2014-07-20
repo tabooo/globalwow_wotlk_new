@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -36,6 +36,7 @@ enum Yells
     SAY_REFLECT                                 = 3,
     SAY_CRYSTAL_SPIKES                          = 4,
     SAY_KILL                                    = 5,
+    SAY_FRENZY                                  = 6
 };
 
 enum Events
@@ -69,7 +70,13 @@ public:
     {
         boss_ormorokAI(Creature* creature) : BossAI(creature, DATA_ORMOROK_EVENT) { }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void Reset()
+        {
+            BossAI::Reset();
+            frenzy = false;
+        }
+
+        void EnterCombat(Unit* /*who*/) override
         {
             _EnterCombat();
 
@@ -81,35 +88,35 @@ public:
 
             Talk(SAY_AGGRO);
 
-            if (instance)
-                instance->SetData(DATA_ORMOROK_EVENT, IN_PROGRESS);
+            instance->SetData(DATA_ORMOROK_EVENT, IN_PROGRESS);
         }
 
-        void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/) OVERRIDE
+        void DamageTaken(Unit* /*attacker*/, uint32& /*damage*/) override
         {
             if (!frenzy && HealthBelowPct(25))
             {
+                Talk(SAY_FRENZY);
                 DoCast(me, SPELL_FRENZY);
                 frenzy = true;
             }
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             _JustDied();
 
             Talk(SAY_DEATH);
 
-            if (instance)
-                instance->SetData(DATA_ORMOROK_EVENT, DONE);
+            instance->SetData(DATA_ORMOROK_EVENT, DONE);
         }
 
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* who) override
         {
-            Talk(SAY_KILL);
+            if (who->GetTypeId() == TYPEID_PLAYER)
+                Talk(SAY_KILL);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -155,9 +162,9 @@ public:
 
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new boss_ormorokAI(creature);
+        return GetInstanceAI<boss_ormorokAI>(creature);
     }
 };
 
@@ -188,9 +195,13 @@ public:
 
     struct npc_crystal_spike_triggerAI : public ScriptedAI
     {
-        npc_crystal_spike_triggerAI(Creature* creature) : ScriptedAI(creature) { }
+        npc_crystal_spike_triggerAI(Creature* creature) : ScriptedAI(creature)
+        {
+            _count = 0;
+            _despawntimer = 0;
+        }
 
-        void IsSummonedBy(Unit* owner) OVERRIDE
+        void IsSummonedBy(Unit* owner) override
         {
             switch (me->GetEntry())
             {
@@ -214,12 +225,12 @@ public:
             _despawntimer = 2000;
         }
 
-        uint32 GetData(uint32 type) const OVERRIDE
+        uint32 GetData(uint32 type) const override
         {
             return type == DATA_COUNT ? _count : 0;
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (_despawntimer <= diff)
             {
@@ -239,7 +250,7 @@ public:
 
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new npc_crystal_spike_triggerAI(creature);
     }
@@ -266,13 +277,13 @@ class spell_crystal_spike : public SpellScriptLoader
                     }
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnEffectPeriodic += AuraEffectPeriodicFn(spell_crystal_spike_AuraScript::HandlePeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
             }
         };
 
-        AuraScript* GetAuraScript() const OVERRIDE
+        AuraScript* GetAuraScript() const override
         {
             return new spell_crystal_spike_AuraScript();
         }

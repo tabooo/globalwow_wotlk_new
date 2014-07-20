@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -151,9 +151,9 @@ class boss_eye_of_cthun : public CreatureScript
 public:
     boss_eye_of_cthun() : CreatureScript("boss_eye_of_cthun") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new eye_of_cthunAI(creature);
+        return GetInstanceAI<eye_of_cthunAI>(creature);
     }
 
     struct eye_of_cthunAI : public ScriptedAI
@@ -161,8 +161,6 @@ public:
         eye_of_cthunAI(Creature* creature) : ScriptedAI(creature)
         {
             instance = creature->GetInstanceScript();
-            if (!instance)
-                TC_LOG_ERROR("scripts", "No Instance eye_of_cthunAI");
 
             SetCombatMovement(false);
         }
@@ -183,7 +181,7 @@ public:
         float DarkGlareAngle;
         bool ClockWise;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             //Phase information
             PhaseTimer = 50000;                                 //First dark glare in 50 seconds
@@ -206,8 +204,7 @@ public:
             me->SetVisible(true);
 
             //Reset Phase
-            if (instance)
-                instance->SetData(DATA_CTHUN_PHASE, PHASE_NOT_STARTED);
+            instance->SetData(DATA_CTHUN_PHASE, PHASE_NOT_STARTED);
 
             //to avoid having a following void zone
             Creature* pPortal= me->FindNearestCreature(NPC_CTHUN_PORTAL, 10);
@@ -215,11 +212,10 @@ public:
                 pPortal->SetReactState(REACT_PASSIVE);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
-            if (instance)
-                instance->SetData(DATA_CTHUN_PHASE, PHASE_EYE_GREEN_BEAM);
+            instance->SetData(DATA_CTHUN_PHASE, PHASE_EYE_GREEN_BEAM);
         }
 
         void SpawnEyeTentacle(float x, float y)
@@ -230,14 +226,10 @@ public:
                         Spawned->AI()->AttackStart(target);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             //Check if we have a target
             if (!UpdateVictim())
-                return;
-
-            //No instance
-            if (!instance)
                 return;
 
             uint32 currentPhase = instance->GetData(DATA_CTHUN_PHASE);
@@ -402,12 +394,8 @@ public:
             }
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) OVERRIDE
+        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
         {
-            //No instance
-            if (!instance)
-                return;
-
             switch (instance->GetData(DATA_CTHUN_PHASE))
             {
                 case PHASE_EYE_GREEN_BEAM:
@@ -457,9 +445,9 @@ class boss_cthun : public CreatureScript
 public:
     boss_cthun() : CreatureScript("boss_cthun") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new cthunAI(creature);
+        return GetInstanceAI<cthunAI>(creature);
     }
 
     struct cthunAI : public ScriptedAI
@@ -469,8 +457,6 @@ public:
             SetCombatMovement(false);
 
             instance = creature->GetInstanceScript();
-            if (!instance)
-                TC_LOG_ERROR("scripts", "No Instance eye_of_cthunAI");
         }
 
         InstanceScript* instance;
@@ -497,9 +483,9 @@ public:
         uint64 StomachEnterTarget;
 
         //Stomach map, bool = true then in stomach
-        UNORDERED_MAP<uint64, bool> Stomach_Map;
+        std::unordered_map<uint64, bool> Stomach_Map;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             //One random wisper every 90 - 300 seconds
             WisperTimer = 90000;
@@ -528,11 +514,10 @@ public:
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
             me->SetVisible(false);
 
-            if (instance)
-                instance->SetData(DATA_CTHUN_PHASE, PHASE_NOT_STARTED);
+            instance->SetData(DATA_CTHUN_PHASE, PHASE_NOT_STARTED);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
         }
@@ -551,7 +536,7 @@ public:
             if (Stomach_Map.empty())
                 return NULL;
 
-            UNORDERED_MAP<uint64, bool>::const_iterator i = Stomach_Map.begin();
+            std::unordered_map<uint64, bool>::const_iterator i = Stomach_Map.begin();
 
             std::list<Unit*> temp;
             std::list<Unit*>::const_iterator j;
@@ -560,7 +545,7 @@ public:
             while (i != Stomach_Map.end())
             {
                 //Check for valid player
-                Unit* unit = Unit::GetUnit(*me, i->first);
+                Unit* unit = ObjectAccessor::GetUnit(*me, i->first);
 
                 //Only units out of stomach
                 if (unit && i->second == false)
@@ -581,7 +566,7 @@ public:
             return (*j);
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -614,10 +599,6 @@ public:
             }
 
             me->SetTarget(0);
-
-            //No instance
-            if (!instance)
-                return;
 
             uint32 currentPhase = instance->GetData(DATA_CTHUN_PHASE);
             if (currentPhase == PHASE_CTHUN_STOMACH || currentPhase == PHASE_CTHUN_WEAK)
@@ -659,7 +640,7 @@ public:
                         me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
 
                         //Emerging phase
-                        //AttackStart(Unit::GetUnit(*me, HoldpPlayer));
+                        //AttackStart(ObjectAccessor::GetUnit(*me, HoldpPlayer));
                         DoZoneInCombat();
 
                         //Place all units in threat list on outside of stomach
@@ -699,13 +680,13 @@ public:
 
                         DoCast(me, SPELL_PURPLE_COLORATION, true);
 
-                        UNORDERED_MAP<uint64, bool>::iterator i = Stomach_Map.begin();
+                        std::unordered_map<uint64, bool>::iterator i = Stomach_Map.begin();
 
                         //Kick all players out of stomach
                         while (i != Stomach_Map.end())
                         {
                             //Check for valid player
-                            Unit* unit = Unit::GetUnit(*me, i->first);
+                            Unit* unit = ObjectAccessor::GetUnit(*me, i->first);
 
                             //Only move units in stomach
                             if (unit && i->second == true)
@@ -731,12 +712,12 @@ public:
                     if (StomachAcidTimer <= diff)
                     {
                         //Apply aura to all players in stomach
-                        UNORDERED_MAP<uint64, bool>::iterator i = Stomach_Map.begin();
+                        std::unordered_map<uint64, bool>::iterator i = Stomach_Map.begin();
 
                         while (i != Stomach_Map.end())
                         {
                             //Check for valid player
-                            Unit* unit = Unit::GetUnit(*me, i->first);
+                            Unit* unit = ObjectAccessor::GetUnit(*me, i->first);
 
                             //Only apply to units in stomach
                             if (unit && i->second == true)
@@ -786,7 +767,7 @@ public:
                         if (StomachEnterVisTimer <= diff)
                         {
                             //Check for valid player
-                            Unit* unit = Unit::GetUnit(*me, StomachEnterTarget);
+                            Unit* unit = ObjectAccessor::GetUnit(*me, StomachEnterTarget);
 
                             if (unit)
                             {
@@ -859,18 +840,13 @@ public:
             }
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (instance)
-                instance->SetData(DATA_CTHUN_PHASE, PHASE_CTHUN_DONE);
+            instance->SetData(DATA_CTHUN_PHASE, PHASE_CTHUN_DONE);
         }
 
-        void DamageTaken(Unit* /*done_by*/, uint32 &damage) OVERRIDE
+        void DamageTaken(Unit* /*done_by*/, uint32 &damage) override
         {
-            //No instance
-            if (!instance)
-                return;
-
             switch (instance->GetData(DATA_CTHUN_PHASE))
             {
                 case PHASE_CTHUN_STOMACH:
@@ -895,7 +871,7 @@ public:
             }
         }
 
-        void DoAction(int32 param) OVERRIDE
+        void DoAction(int32 param) override
         {
             switch (param)
             {
@@ -913,7 +889,7 @@ class npc_eye_tentacle : public CreatureScript
 public:
     npc_eye_tentacle() : CreatureScript("npc_eye_tentacle") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new eye_tentacleAI(creature);
     }
@@ -922,6 +898,10 @@ public:
     {
         eye_tentacleAI(Creature* creature) : ScriptedAI(creature)
         {
+            MindflayTimer = 500;
+            KillSelfTimer = 35000;
+
+            Portal = 0;
             if (Creature* pPortal = me->SummonCreature(NPC_SMALL_PORTAL, *me, TEMPSUMMON_CORPSE_DESPAWN))
             {
                 pPortal->SetReactState(REACT_PASSIVE);
@@ -935,13 +915,13 @@ public:
         uint32 KillSelfTimer;
         uint64 Portal;
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (Unit* p = Unit::GetUnit(*me, Portal))
+            if (Unit* p = ObjectAccessor::GetUnit(*me, Portal))
                 p->Kill(p);
         }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             //Mind flay half a second after we spawn
             MindflayTimer = 500;
@@ -950,12 +930,12 @@ public:
             KillSelfTimer = 35000;
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -988,7 +968,7 @@ class npc_claw_tentacle : public CreatureScript
 public:
     npc_claw_tentacle() : CreatureScript("npc_claw_tentacle") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new claw_tentacleAI(creature);
     }
@@ -997,8 +977,13 @@ public:
     {
         claw_tentacleAI(Creature* creature) : ScriptedAI(creature)
         {
+            GroundRuptureTimer = 500;
+            HamstringTimer = 2000;
+            EvadeTimer = 5000;
+
             SetCombatMovement(false);
 
+            Portal = 0;
             if (Creature* pPortal = me->SummonCreature(NPC_SMALL_PORTAL, *me, TEMPSUMMON_CORPSE_DESPAWN))
             {
                 pPortal->SetReactState(REACT_PASSIVE);
@@ -1011,13 +996,13 @@ public:
         uint32 EvadeTimer;
         uint64 Portal;
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (Unit* p = Unit::GetUnit(*me, Portal))
+            if (Unit* p = ObjectAccessor::GetUnit(*me, Portal))
                 p->Kill(p);
         }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             //First rupture should happen half a second after we spawn
             GroundRuptureTimer = 500;
@@ -1025,12 +1010,12 @@ public:
             EvadeTimer = 5000;
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -1041,7 +1026,7 @@ public:
             {
                 if (EvadeTimer <= diff)
                 {
-                    if (Unit* p = Unit::GetUnit(*me, Portal))
+                    if (Unit* p = ObjectAccessor::GetUnit(*me, Portal))
                         p->Kill(p);
 
                     //Dissapear and reappear at new position
@@ -1098,7 +1083,7 @@ class npc_giant_claw_tentacle : public CreatureScript
 public:
     npc_giant_claw_tentacle() : CreatureScript("npc_giant_claw_tentacle") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new giant_claw_tentacleAI(creature);
     }
@@ -1107,8 +1092,14 @@ public:
     {
         giant_claw_tentacleAI(Creature* creature) : ScriptedAI(creature)
         {
+            GroundRuptureTimer = 500;
+            HamstringTimer = 2000;
+            ThrashTimer = 5000;
+            EvadeTimer = 5000;
+
             SetCombatMovement(false);
 
+            Portal = 0;
             if (Creature* pPortal = me->SummonCreature(NPC_GIANT_PORTAL, *me, TEMPSUMMON_CORPSE_DESPAWN))
             {
                 pPortal->SetReactState(REACT_PASSIVE);
@@ -1122,13 +1113,13 @@ public:
         uint32 EvadeTimer;
         uint64 Portal;
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (Unit* p = Unit::GetUnit(*me, Portal))
+            if (Unit* p = ObjectAccessor::GetUnit(*me, Portal))
                 p->Kill(p);
         }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             //First rupture should happen half a second after we spawn
             GroundRuptureTimer = 500;
@@ -1137,12 +1128,12 @@ public:
             EvadeTimer = 5000;
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -1153,7 +1144,7 @@ public:
             {
                 if (EvadeTimer <= diff)
                 {
-                    if (Unit* p = Unit::GetUnit(*me, Portal))
+                    if (Unit* p = ObjectAccessor::GetUnit(*me, Portal))
                         p->Kill(p);
 
                     //Dissapear and reappear at new position
@@ -1217,7 +1208,7 @@ class npc_giant_eye_tentacle : public CreatureScript
 public:
     npc_giant_eye_tentacle() : CreatureScript("npc_giant_eye_tentacle") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new giant_eye_tentacleAI(creature);
     }
@@ -1226,8 +1217,11 @@ public:
     {
         giant_eye_tentacleAI(Creature* creature) : ScriptedAI(creature)
         {
+            BeamTimer = 500;
+
             SetCombatMovement(false);
 
+            Portal = 0;
             if (Creature* pPortal = me->SummonCreature(NPC_GIANT_PORTAL, *me, TEMPSUMMON_CORPSE_DESPAWN))
             {
                 pPortal->SetReactState(REACT_PASSIVE);
@@ -1238,24 +1232,24 @@ public:
         uint32 BeamTimer;
         uint64 Portal;
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (Unit* p = Unit::GetUnit(*me, Portal))
+            if (Unit* p = ObjectAccessor::GetUnit(*me, Portal))
                 p->Kill(p);
         }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             //Green Beam half a second after we spawn
             BeamTimer = 500;
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             DoZoneInCombat();
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             //Check if we have a target
             if (!UpdateVictim())
@@ -1281,7 +1275,7 @@ class npc_giant_flesh_tentacle : public CreatureScript
 public:
     npc_giant_flesh_tentacle() : CreatureScript("npc_giant_flesh_tentacle") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
         return new flesh_tentacleAI(creature);
     }
@@ -1293,7 +1287,7 @@ public:
             SetCombatMovement(false);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             if (TempSummon* summon = me->ToTempSummon())
                 if (Unit* summoner = summon->GetSummoner())

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -27,13 +27,6 @@ class Map;
 class GridState
 {
     public:
-#ifdef TRINITY_DEBUG
-#define MAGIC_TESTVAL 0xFBE823BA
-        GridState() { i_Magic = MAGIC_TESTVAL; }
-        bool checkMagic();
-        void setMagic() { i_Magic = MAGIC_TESTVAL; }
-        unsigned int i_Magic;
-#endif
         virtual ~GridState() { };
         virtual void Update(Map &, NGridType&, GridInfo &, uint32 t_diff) const = 0;
 };

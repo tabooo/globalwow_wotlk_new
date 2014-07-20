@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -17,23 +17,23 @@
 
 #include <OpenSSLCrypto.h>
 #include <openssl/crypto.h>
-#include <ace/Thread_Mutex.h>
 #include <vector>
-#include <ace/Thread.h>
+#include <thread>
+#include <mutex>
 
-std::vector<ACE_Thread_Mutex*> cryptoLocks;
+std::vector<std::mutex*> cryptoLocks;
 
 static void lockingCallback(int mode, int type, const char* /*file*/, int /*line*/)
 {
     if (mode & CRYPTO_LOCK)
-        cryptoLocks[type]->acquire();
+        cryptoLocks[type]->lock();
     else
-        cryptoLocks[type]->release();
+        cryptoLocks[type]->unlock();
 }
 
 static void threadIdCallback(CRYPTO_THREADID * id)
 {
-    CRYPTO_THREADID_set_numeric(id, ACE_Thread::self());
+    CRYPTO_THREADID_set_numeric(id, std::hash<std::thread::id>()(std::this_thread::get_id()));
 }
 
 void OpenSSLCrypto::threadsSetup()
@@ -41,7 +41,7 @@ void OpenSSLCrypto::threadsSetup()
     cryptoLocks.resize(CRYPTO_num_locks());
     for(int i = 0 ; i < CRYPTO_num_locks(); ++i)
     {
-        cryptoLocks[i] = new ACE_Thread_Mutex();
+        cryptoLocks[i] = new std::mutex;
     }
     CRYPTO_THREADID_set_callback(threadIdCallback);
     CRYPTO_set_locking_callback(lockingCallback);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -25,9 +25,9 @@ enum Spells
     SPELL_SPARK                                   = 47751,
     H_SPELL_SPARK                                 = 57062,
     SPELL_RIFT_SHIELD                             = 47748,
-    SPELL_CHARGE_RIFT                             = 47747, //Works wrong (affect players, not rifts)
-    SPELL_CREATE_RIFT                             = 47743, //Don't work, using WA
-    SPELL_ARCANE_ATTRACTION                       = 57063, //No idea, when it's used
+    SPELL_CHARGE_RIFT                             = 47747, // Works wrong (affect players, not rifts)
+    SPELL_CREATE_RIFT                             = 47743, // Don't work, using WA
+    SPELL_ARCANE_ATTRACTION                       = 57063, // No idea, when it's used
 };
 
 enum Adds
@@ -41,14 +41,16 @@ enum Yells
     SAY_AGGRO                                     = 0,
     SAY_DEATH                                     = 1,
     SAY_RIFT                                      = 2,
-    SAY_SHIELD                                    = 3
+    SAY_SHIELD                                    = 3,
+    SAY_RIFT_EMOTE                                = 4, // Needs to be added to script
+    SAY_SHIELD_EMOTE                              = 5  // Needs to be added to script
 };
 
 enum RiftSpells
 {
     SPELL_CHAOTIC_ENERGY_BURST                    = 47688,
     SPELL_CHARGED_CHAOTIC_ENERGY_BURST            = 47737,
-    SPELL_ARCANEFORM                              = 48019, //Chaotic Rift visual
+    SPELL_ARCANEFORM                              = 48019, // Chaotic Rift visual
 };
 
 Position const RiftLocation[6] =
@@ -86,34 +88,31 @@ class boss_anomalus : public CreatureScript
             uint64 uiChaoticRiftGUID;
             bool chaosTheory;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 Phase = 0;
                 uiSparkTimer = 5000;
                 uiChaoticRiftGUID = 0;
                 chaosTheory = true;
 
-                if (instance)
-                    instance->SetData(DATA_ANOMALUS_EVENT, NOT_STARTED);
+                instance->SetData(DATA_ANOMALUS_EVENT, NOT_STARTED);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
 
-                if (instance)
-                    instance->SetData(DATA_ANOMALUS_EVENT, IN_PROGRESS);
+                instance->SetData(DATA_ANOMALUS_EVENT, IN_PROGRESS);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 Talk(SAY_DEATH);
 
-                if (instance)
-                    instance->SetData(DATA_ANOMALUS_EVENT, DONE);
+                instance->SetData(DATA_ANOMALUS_EVENT, DONE);
             }
 
-            uint32 GetData(uint32 type) const OVERRIDE
+            uint32 GetData(uint32 type) const override
             {
                 if (type == DATA_CHAOS_THEORY)
                     return chaosTheory ? 1 : 0;
@@ -121,13 +120,13 @@ class boss_anomalus : public CreatureScript
                 return 0;
             }
 
-            void SummonedCreatureDies(Creature* summoned, Unit* /*who*/) OVERRIDE
+            void SummonedCreatureDies(Creature* summoned, Unit* /*who*/) override
             {
                 if (summoned->GetEntry() == NPC_CHAOTIC_RIFT)
                     chaosTheory = false;
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -183,9 +182,9 @@ class boss_anomalus : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
-            return new boss_anomalusAI(creature);
+            return GetInstanceAI<boss_anomalusAI>(creature);
         }
 };
 
@@ -207,7 +206,7 @@ class npc_chaotic_rift : public CreatureScript
             uint32 uiChaoticEnergyBurstTimer;
             uint32 uiSummonCrazedManaWraithTimer;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 uiChaoticEnergyBurstTimer = 1000;
                 uiSummonCrazedManaWraithTimer = 5000;
@@ -215,7 +214,7 @@ class npc_chaotic_rift : public CreatureScript
                 DoCast(me, SPELL_ARCANEFORM, false);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -251,9 +250,9 @@ class npc_chaotic_rift : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
-            return new npc_chaotic_riftAI(creature);
+            return GetInstanceAI<npc_chaotic_riftAI>(creature);
         }
 };
 
@@ -264,7 +263,7 @@ class achievement_chaos_theory : public AchievementCriteriaScript
         {
         }
 
-        bool OnCheck(Player* /*player*/, Unit* target) OVERRIDE
+        bool OnCheck(Player* /*player*/, Unit* target) override
         {
             if (!target)
                 return false;

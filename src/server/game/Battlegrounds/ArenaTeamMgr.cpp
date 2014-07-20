@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -159,10 +159,10 @@ void ArenaTeamMgr::DistributeArenaPoints()
     {
         // Add points to player if online
         if (Player* player = HashMapHolder<Player>::Find(playerItr->first))
-            player->ModifyArenaPoints(playerItr->second, &trans);
+            player->ModifyArenaPoints(playerItr->second, trans);
         else    // Update database
         {
-            stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_CHAR_ARENA_POINTS);
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ADD_CHAR_ARENA_POINTS);
             stmt->setUInt32(0, playerItr->second);
             stmt->setUInt32(1, playerItr->first);
             trans->Append(stmt);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -21,6 +21,7 @@
 #include "DatabaseEnv.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
+#include "ScriptMgr.h"
 #include "Util.h"
 #include "SHA1.h"
 #include "WorldSession.h"
@@ -166,10 +167,16 @@ AccountOpResult AccountMgr::ChangePassword(uint32 accountId, std::string newPass
     std::string username;
 
     if (!GetName(accountId, username))
+    {
+        sScriptMgr->OnFailedPasswordChange(accountId);
         return AOR_NAME_NOT_EXIST;                          // account doesn't exist
+    }
 
     if (utf8length(newPassword) > MAX_ACCOUNT_STR)
+    {
+        sScriptMgr->OnFailedPasswordChange(accountId);
         return AOR_PASS_TOO_LONG;
+    }
 
     normalizeString(username);
     normalizeString(newPassword);
@@ -189,6 +196,7 @@ AccountOpResult AccountMgr::ChangePassword(uint32 accountId, std::string newPass
 
     LoginDatabase.Execute(stmt);
 
+    sScriptMgr->OnPasswordChange(accountId);
     return AOR_OK;
 }
 
@@ -197,10 +205,16 @@ AccountOpResult AccountMgr::ChangeEmail(uint32 accountId, std::string newEmail)
     std::string username;
 
     if (!GetName(accountId, username))
+    {
+        sScriptMgr->OnFailedEmailChange(accountId);
         return AOR_NAME_NOT_EXIST;                          // account doesn't exist
+    }
 
     if (utf8length(newEmail) > MAX_EMAIL_STR)
+    {
+        sScriptMgr->OnFailedEmailChange(accountId);
         return AOR_EMAIL_TOO_LONG;
+    }
 
     normalizeString(username);
     normalizeString(newEmail);
@@ -212,6 +226,7 @@ AccountOpResult AccountMgr::ChangeEmail(uint32 accountId, std::string newEmail)
 
     LoginDatabase.Execute(stmt);
 
+    sScriptMgr->OnEmailChange(accountId);
     return AOR_OK;
 }
 
@@ -220,10 +235,16 @@ AccountOpResult AccountMgr::ChangeRegEmail(uint32 accountId, std::string newEmai
     std::string username;
 
     if (!GetName(accountId, username))
+    {
+        sScriptMgr->OnFailedEmailChange(accountId);
         return AOR_NAME_NOT_EXIST;                          // account doesn't exist
+    }
 
     if (utf8length(newEmail) > MAX_EMAIL_STR)
+    {
+        sScriptMgr->OnFailedEmailChange(accountId);
         return AOR_EMAIL_TOO_LONG;
+    }
 
     normalizeString(username);
     normalizeString(newEmail);
@@ -235,6 +256,7 @@ AccountOpResult AccountMgr::ChangeRegEmail(uint32 accountId, std::string newEmai
 
     LoginDatabase.Execute(stmt);
 
+    sScriptMgr->OnEmailChange(accountId);
     return AOR_OK;
 }
 
@@ -348,13 +370,8 @@ bool AccountMgr::normalizeString(std::string& utf8String)
     size_t maxLength = MAX_ACCOUNT_STR;
     if (!Utf8toWStr(utf8String, buffer, maxLength))
         return false;
-#ifdef _MSC_VER
-#pragma warning(disable: 4996)
-#endif
+
     std::transform(&buffer[0], buffer+maxLength, &buffer[0], wcharToUpperOnlyLatin);
-#ifdef _MSC_VER
-#pragma warning(default: 4996)
-#endif
 
     return WStrToUtf8(buffer, maxLength, utf8String);
 }
@@ -459,7 +476,7 @@ void AccountMgr::LoadRBAC()
     {
         Field* field = result->Fetch();
         uint32 newId = field[0].GetUInt32();
-        if (secId != newId)
+        if (secId != newId || permissions == NULL)
         {
             secId = newId;
             permissions = &_defaultPermissions[secId];
@@ -522,7 +539,7 @@ bool AccountMgr::HasPermission(uint32 accountId, uint32 permissionId, uint32 rea
         return false;
     }
 
-    rbac::RBACData rbac(accountId, "", realmId);
+    rbac::RBACData rbac(accountId, "", realmId, GetSecurity(accountId));
     rbac.LoadFromDB();
     bool hasPermission = rbac.HasPermission(permissionId);
 

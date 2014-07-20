@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -22,8 +22,8 @@
 #include "Define.h"
 #include "Errors.h"
 #include "ByteConverter.h"
+#include "Util.h"
 
-#include <ace/OS_NS_time.h>
 #include <exception>
 #include <list>
 #include <map>
@@ -31,6 +31,7 @@
 #include <vector>
 #include <cstring>
 #include <time.h>
+#include <math.h>
 
 // Root of ByteBuffer exception hierarchy
 class ByteBufferException : public std::exception
@@ -84,6 +85,8 @@ class ByteBuffer
             _storage(buf._storage)
         {
         }
+
+        virtual ~ByteBuffer() { }
 
         void clear()
         {
@@ -239,12 +242,16 @@ class ByteBuffer
         ByteBuffer &operator>>(float &value)
         {
             value = read<float>();
+            if (!std::isfinite(value))
+                throw ByteBufferException();
             return *this;
         }
 
         ByteBuffer &operator>>(double &value)
         {
             value = read<double>();
+            if (!std::isfinite(value))
+                throw ByteBufferException();
             return *this;
         }
 
@@ -375,9 +382,19 @@ class ByteBuffer
             return *this;
         }
 
-        uint8 * contents() { return &_storage[0]; }
+        uint8 * contents()
+        {
+            if (_storage.empty())
+                throw ByteBufferException();
+            return &_storage[0];
+        }
 
-        const uint8 *contents() const { return &_storage[0]; }
+        const uint8 *contents() const
+        {
+            if (_storage.empty())
+                throw ByteBufferException();
+            return &_storage[0];
+        }
 
         size_t size() const { return _storage.size(); }
         bool empty() const { return _storage.empty(); }
@@ -459,7 +476,7 @@ class ByteBuffer
         void AppendPackedTime(time_t time)
         {
             tm lt;
-            ACE_OS::localtime_r(&time, &lt);
+            localtime_r(&time, &lt);
             append<uint32>((lt.tm_year - 100) << 24 | lt.tm_mon  << 20 | (lt.tm_mday - 1) << 14 | lt.tm_wday << 11 | lt.tm_hour << 6 | lt.tm_min);
         }
 

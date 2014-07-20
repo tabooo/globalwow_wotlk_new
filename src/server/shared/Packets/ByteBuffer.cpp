@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -20,18 +20,16 @@
 #include "Common.h"
 #include "Log.h"
 
-#include <ace/Stack_Trace.h>
 #include <sstream>
 
 ByteBufferPositionException::ByteBufferPositionException(bool add, size_t pos,
                                                          size_t size, size_t valueSize)
 {
     std::ostringstream ss;
-    ACE_Stack_Trace trace;
 
     ss << "Attempted to " << (add ? "put" : "get") << " value with size: "
        << valueSize << " in ByteBuffer (pos: " << pos << " size: " << size
-       << ")\n\n" << trace.c_str();
+       << ")";
 
     message().assign(ss.str());
 }
@@ -40,12 +38,10 @@ ByteBufferSourceException::ByteBufferSourceException(size_t pos, size_t size,
                                                      size_t valueSize)
 {
     std::ostringstream ss;
-    ACE_Stack_Trace trace;
 
     ss << "Attempted to put a "
        << (valueSize > 0 ? "NULL-pointer" : "zero-sized value")
-       << " in ByteBuffer (pos: " << pos << " size: " << size << ")\n\n"
-       << trace.c_str();
+       << " in ByteBuffer (pos: " << pos << " size: " << size << ")";
 
     message().assign(ss.str());
 }

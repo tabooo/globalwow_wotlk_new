@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -40,7 +40,7 @@ class npc_pet_mage_mirror_image : public CreatureScript
         {
             npc_pet_mage_mirror_imageAI(Creature* creature) : CasterAI(creature) { }
 
-            void InitializeAI() OVERRIDE
+            void InitializeAI() override
             {
                 CasterAI::InitializeAI();
                 Unit* owner = me->GetOwner();
@@ -49,13 +49,13 @@ class npc_pet_mage_mirror_image : public CreatureScript
                 // Inherit Master's Threat List (not yet implemented)
                 owner->CastSpell((Unit*)NULL, SPELL_MAGE_MASTERS_THREAT_LIST, true);
                 // here mirror image casts on summoner spell (not present in client dbc) 49866
-                // here should be auras (not present in client dbc): 35657, 35658, 35659, 35660 selfcasted by mirror images (stats related?)
+                // here should be auras (not present in client dbc): 35657, 35658, 35659, 35660 selfcast by mirror images (stats related?)
                 // Clone Me!
                 owner->CastSpell(me, SPELL_MAGE_CLONE_ME, false);
             }
 
             // Do not reload Creature templates on evade mode enter - prevent visual lost
-            void EnterEvadeMode() OVERRIDE
+            void EnterEvadeMode() override
             {
                 if (me->IsInEvadeMode() || !me->IsAlive())
                     return;
@@ -71,7 +71,7 @@ class npc_pet_mage_mirror_image : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_pet_mage_mirror_imageAI(creature);
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -133,7 +133,7 @@ public:
             Reset();
         }
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             if (!IsCombatMovementAllowed())
                 SetCombatMovement(true);
@@ -145,15 +145,12 @@ public:
             SummonWhelpCount = 0;
             IsMoving = false;
 
-            if (instance)
-            {
-                instance->SetBossState(DATA_ONYXIA, NOT_STARTED);
-                instance->SetData(DATA_ONYXIA_PHASE, Phase);
-                instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT,  ACHIEV_TIMED_START_EVENT);
-            }
+            instance->SetBossState(DATA_ONYXIA, NOT_STARTED);
+            instance->SetData(DATA_ONYXIA_PHASE, Phase);
+            instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT,  ACHIEV_TIMED_START_EVENT);
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
             me->SetInCombatWithZone();
@@ -163,22 +160,18 @@ public:
             events.ScheduleEvent(EVENT_CLEAVE, urand (2000, 5000));
             events.ScheduleEvent(EVENT_WING_BUFFET, urand (10000, 20000));
 
-            if (instance)
-            {
-                instance->SetBossState(DATA_ONYXIA, IN_PROGRESS);
-                instance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT,  ACHIEV_TIMED_START_EVENT);
-            }
+            instance->SetBossState(DATA_ONYXIA, IN_PROGRESS);
+            instance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT,  ACHIEV_TIMED_START_EVENT);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
-            if (instance)
-                instance->SetBossState(DATA_ONYXIA, DONE);
+            instance->SetBossState(DATA_ONYXIA, DONE);
 
             Summons.DespawnAll();
         }
 
-        void JustSummoned(Creature* summoned) OVERRIDE
+        void JustSummoned(Creature* summoned) override
         {
             summoned->SetInCombatWithZone();
             if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
@@ -196,17 +189,17 @@ public:
             Summons.Summon(summoned);
         }
 
-        void SummonedCreatureDespawn(Creature* summon) OVERRIDE
+        void SummonedCreatureDespawn(Creature* summon) override
         {
             Summons.Despawn(summon);
         }
 
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* /*victim*/) override
         {
             Talk(SAY_KILL);
         }
 
-        void SpellHit(Unit* /*pCaster*/, const SpellInfo* Spell) OVERRIDE
+        void SpellHit(Unit* /*pCaster*/, const SpellInfo* Spell) override
         {
             if (Spell->Id == SPELL_BREATH_EAST_TO_WEST ||
                 Spell->Id == SPELL_BREATH_WEST_TO_EAST ||
@@ -223,7 +216,7 @@ public:
             }
         }
 
-        void MovementInform(uint32 type, uint32 id) OVERRIDE
+        void MovementInform(uint32 type, uint32 id) override
         {
             if (type == POINT_MOTION_TYPE)
             {
@@ -246,8 +239,7 @@ public:
                         me->GetMotionMaster()->MovePoint(11, Phase2Location.GetPositionX(), Phase2Location.GetPositionY(), Phase2Location.GetPositionZ()+25);
                         me->SetSpeed(MOVE_FLIGHT, 1.0f);
                         Talk(SAY_PHASE_2_TRANS);
-                        if (instance)
-                            instance->SetData(DATA_ONYXIA_PHASE, Phase);
+                        instance->SetData(DATA_ONYXIA_PHASE, Phase);
                         events.ScheduleEvent(EVENT_WHELP_SPAWN, 5000);
                         events.ScheduleEvent(EVENT_LAIR_GUARD, 15000);
                         break;
@@ -264,7 +256,7 @@ public:
             }
         }
 
-        void SpellHitTarget(Unit* target, const SpellInfo* Spell) OVERRIDE
+        void SpellHitTarget(Unit* target, const SpellInfo* Spell) override
         {
             //Workaround - Couldn't find a way to group this spells (All Eruption)
             if (((Spell->Id >= 17086 && Spell->Id <= 17095) ||
@@ -280,10 +272,7 @@ public:
                 (Spell->Id >= 22267 && Spell->Id <= 22268)) &&
                 (target->GetTypeId() == TYPEID_PLAYER))
             {
-                if (instance)
-                {
                     instance->SetData(DATA_SHE_DEEP_BREATH_MORE, FAIL);
-                }
             }
         }
 
@@ -312,7 +301,7 @@ public:
             MovePoint = iTemp;
         }
 
-        void UpdateAI(uint32 diff) OVERRIDE
+        void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
@@ -351,7 +340,7 @@ public:
                             Trinity::GameObjectInRangeCheck check(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), 15);
                             Trinity::GameObjectLastSearcher<Trinity::GameObjectInRangeCheck> searcher(me, Floor, check);
                             me->VisitNearbyGridObject(30, searcher);
-                            if (instance && Floor)
+                            if (Floor)
                                 instance->SetData64(DATA_FLOOR_ERUPTION_GUID, Floor->GetGUID());
                             events.ScheduleEvent(EVENT_BELLOWING_ROAR, 30000);
                             break;
@@ -383,8 +372,7 @@ public:
                 if (HealthBelowPct(40))
                 {
                     Phase = PHASE_END;
-                    if (instance)
-                        instance->SetData(DATA_ONYXIA_PHASE, PHASE_END);
+                    instance->SetData(DATA_ONYXIA_PHASE, PHASE_END);
                     Talk(SAY_PHASE_3_TRANS);
 
                     SetCombatMovement(true);
@@ -404,7 +392,7 @@ public:
                         case EVENT_DEEP_BREATH:      // Phase PHASE_BREATH
                             if (!IsMoving)
                             {
-                                if (me->IsNonMeleeSpellCasted(false))
+                                if (me->IsNonMeleeSpellCast(false))
                                     me->InterruptNonMeleeSpells(false);
 
                                 Talk(EMOTE_BREATH);
@@ -467,9 +455,9 @@ public:
             bool IsMoving;
     };
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new boss_onyxiaAI(creature);
+        return GetInstanceAI<boss_onyxiaAI>(creature);
     }
 };
 

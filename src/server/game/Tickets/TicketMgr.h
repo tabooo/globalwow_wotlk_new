@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,7 +19,6 @@
 #define _TICKETMGR_H
 
 #include <string>
-#include <ace/Singleton.h>
 
 #include "ObjectMgr.h"
 
@@ -82,10 +81,10 @@ class GmTicket
 {
 public:
     GmTicket();
-    GmTicket(Player* player, WorldPacket& recvData);
+    GmTicket(Player* player);
     ~GmTicket();
 
-    bool IsClosed() const { return _closedBy; }
+    bool IsClosed() const { return _closedBy != 0; }
     bool IsCompleted() const { return _completed; }
     bool IsFromPlayer(uint64 guid) const { return guid == _playerGuid; }
     bool IsAssigned() const { return _assignedTo != 0; }
@@ -129,6 +128,8 @@ public:
     void SetComment(std::string const& comment) { _comment = comment; }
     void SetViewed() { _viewed = true; }
     void SetUnassigned();
+    void SetPosition(uint32 mapId, float x, float y, float z);
+    void SetGmAction(uint32 needResponse, bool needMoreHelp);
 
     void AppendResponse(std::string const& response) { _response += response; }
 
@@ -164,7 +165,7 @@ private:
     GMTicketEscalationStatus _escalatedStatus;
     bool _viewed;
     bool _needResponse; /// @todo find out the use of this, and then store it in DB
-    bool _haveTicket;
+    bool _needMoreHelp;
     std::string _response;
     std::string _chatLog; // No need to store in db, will be refreshed every session client side
 };
@@ -172,13 +173,17 @@ typedef std::map<uint32, GmTicket*> GmTicketList;
 
 class TicketMgr
 {
-    friend class ACE_Singleton<TicketMgr, ACE_Null_Mutex>;
-
 private:
     TicketMgr();
     ~TicketMgr();
 
 public:
+    static TicketMgr* instance()
+    {
+        static TicketMgr* instance = new TicketMgr();
+        return instance;
+    }
+
     void LoadTickets();
     void LoadSurveys();
 
@@ -244,6 +249,6 @@ protected:
     uint64 _lastChange;
 };
 
-#define sTicketMgr ACE_Singleton<TicketMgr, ACE_Null_Mutex>::instance()
+#define sTicketMgr TicketMgr::instance()
 
 #endif // _TICKETMGR_H

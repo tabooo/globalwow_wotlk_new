@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,7 +19,7 @@
 #include "SocialMgr.h"
 
 #include "DatabaseEnv.h"
-#include "Opcodes.h"
+#include "WorldSession.h"
 #include "WorldPacket.h"
 #include "Player.h"
 #include "ObjectMgr.h"
@@ -187,7 +187,7 @@ bool PlayerSocial::HasIgnore(uint32 ignore_guid)
 {
     PlayerSocialMap::const_iterator itr = m_playerSocialMap.find(ignore_guid);
     if (itr != m_playerSocialMap.end())
-        return itr->second.Flags & SOCIAL_FLAG_IGNORED;
+        return (itr->second.Flags & SOCIAL_FLAG_IGNORED) != 0;
     return false;
 }
 

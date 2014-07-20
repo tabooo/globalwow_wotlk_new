@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -68,7 +68,7 @@ class boss_void_reaver : public CreatureScript
 
             bool Enraged;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 Pounding_Timer = 15000;
                 ArcaneOrb_Timer = 3000;
@@ -77,33 +77,31 @@ class boss_void_reaver : public CreatureScript
 
                 Enraged = false;
 
-                if (instance && me->IsAlive())
+                if (me->IsAlive())
                     instance->SetData(DATA_VOIDREAVEREVENT, NOT_STARTED);
             }
 
-            void KilledUnit(Unit* /*victim*/) OVERRIDE
+            void KilledUnit(Unit* /*victim*/) override
             {
                 Talk(SAY_SLAY);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 Talk(SAY_DEATH);
                 DoZoneInCombat();
 
-                if (instance)
-                    instance->SetData(DATA_VOIDREAVEREVENT, DONE);
+                instance->SetData(DATA_VOIDREAVEREVENT, DONE);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
 
-                if (instance)
-                    instance->SetData(DATA_VOIDREAVEREVENT, IN_PROGRESS);
+                instance->SetData(DATA_VOIDREAVEREVENT, IN_PROGRESS);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim())
                     return;
@@ -124,7 +122,7 @@ class boss_void_reaver : public CreatureScript
                     std::vector<Unit*> target_list;
                     for (std::list<HostileReference*>::const_iterator itr = t_list.begin(); itr!= t_list.end(); ++itr)
                     {
-                        target = Unit::GetUnit(*me, (*itr)->getUnitGuid());
+                        target = ObjectAccessor::GetUnit(*me, (*itr)->getUnitGuid());
                         if (!target)
                             continue;
                         // exclude pets & totems, 18 yard radius minimum
@@ -170,9 +168,9 @@ class boss_void_reaver : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
-            return new boss_void_reaverAI(creature);
+            return GetInstanceAI<boss_void_reaverAI>(creature);
         }
 };
 

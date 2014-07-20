@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -20,7 +20,6 @@
 
 #include "Common.h"
 #include "Channel.h"
-#include <ace/Singleton.h>
 
 #include <map>
 #include <string>
@@ -31,11 +30,16 @@ class ChannelMgr
 {
     typedef std::map<std::wstring, Channel*> ChannelMap;
 
-    public:
-        ChannelMgr() : team(0)
-        { }
-
+    protected:
+        ChannelMgr() : team(0) { }
         ~ChannelMgr();
+
+    public:
+        static ChannelMgr* instance()
+        {
+            static ChannelMgr* instance = new ChannelMgr();
+            return instance;
+        }
 
         static ChannelMgr * forTeam(uint32 team);
         void setTeam(uint32 newTeam) { team = newTeam; }

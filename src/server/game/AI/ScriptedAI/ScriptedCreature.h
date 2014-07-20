@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -98,7 +98,7 @@ public:
         Trinity::Containers::RandomResizeList<uint64, Predicate>(listCopy, predicate, max);
         for (StorageType::iterator i = listCopy.begin(); i != listCopy.end(); )
         {
-            Creature* summon = Unit::GetCreature(*me, *i++);
+            Creature* summon = ObjectAccessor::GetCreature(*me, *i++);
             if (summon && summon->IsAIEnabled)
                 summon->AI()->DoAction(info);
         }

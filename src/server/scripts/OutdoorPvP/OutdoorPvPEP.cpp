@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -111,20 +111,20 @@ void OPvPCapturePointEP_EWT::SendChangePhase()
 
 void OPvPCapturePointEP_EWT::FillInitialWorldStates(WorldPacket &data)
 {
-    data << EP_EWT_A << uint32(bool(m_TowerState & EP_TS_A));
-    data << EP_EWT_H << uint32(bool(m_TowerState & EP_TS_H));
-    data << EP_EWT_N_A << uint32(bool(m_TowerState & EP_TS_N_A));
-    data << EP_EWT_N_H << uint32(bool(m_TowerState & EP_TS_N_H));
-    data << EP_EWT_N << uint32(bool(m_TowerState & EP_TS_N));
+    data << EP_EWT_A << uint32((m_TowerState & EP_TS_A) != 0);
+    data << EP_EWT_H << uint32((m_TowerState & EP_TS_H) != 0);
+    data << EP_EWT_N_A << uint32((m_TowerState & EP_TS_N_A) != 0);
+    data << EP_EWT_N_H << uint32((m_TowerState & EP_TS_N_H) != 0);
+    data << EP_EWT_N << uint32((m_TowerState & EP_TS_N) != 0);
 }
 
 void OPvPCapturePointEP_EWT::UpdateTowerState()
 {
-    m_PvP->SendUpdateWorldState(EP_EWT_A, bool(m_TowerState & EP_TS_A));
-    m_PvP->SendUpdateWorldState(EP_EWT_H, bool(m_TowerState & EP_TS_H));
-    m_PvP->SendUpdateWorldState(EP_EWT_N_A, bool(m_TowerState & EP_TS_N_A));
-    m_PvP->SendUpdateWorldState(EP_EWT_N_H, bool(m_TowerState & EP_TS_N_H));
-    m_PvP->SendUpdateWorldState(EP_EWT_N, bool(m_TowerState & EP_TS_N));
+    m_PvP->SendUpdateWorldState(EP_EWT_A, (m_TowerState & EP_TS_A) != 0);
+    m_PvP->SendUpdateWorldState(EP_EWT_H, (m_TowerState & EP_TS_H) != 0);
+    m_PvP->SendUpdateWorldState(EP_EWT_N_A, (m_TowerState & EP_TS_N_A) != 0);
+    m_PvP->SendUpdateWorldState(EP_EWT_N_H, (m_TowerState & EP_TS_N_H) != 0);
+    m_PvP->SendUpdateWorldState(EP_EWT_N, (m_TowerState & EP_TS_N) != 0);
 }
 
 bool OPvPCapturePointEP_EWT::HandlePlayerEnter(Player* player)
@@ -151,16 +151,16 @@ void OPvPCapturePointEP_EWT::SummonSupportUnitAtNorthpassTower(uint32 team)
     if (m_UnitsSummonedSide != team)
     {
         m_UnitsSummonedSide = team;
-        const creature_type * ct = NULL;
+        creature_type const* ct = nullptr;
         if (team == ALLIANCE)
-            ct=EP_EWT_Summons_A;
+            ct = EP_EWT_Summons_A;
         else
-            ct=EP_EWT_Summons_H;
+            ct = EP_EWT_Summons_H;
 
         for (uint8 i = 0; i < EP_EWT_NUM_CREATURES; ++i)
         {
             DelCreature(i);
-            AddCreature(i, ct[i].entry, ct[i].teamval, ct[i].map, ct[i].x, ct[i].y, ct[i].z, ct[i].o, 1000000);
+            AddCreature(i, ct[i].entry, ct[i].map, ct[i].x, ct[i].y, ct[i].z, ct[i].o, OutdoorPvP::GetTeamIdByTeam(team), 1000000);
         }
     }
 }
@@ -259,20 +259,20 @@ void OPvPCapturePointEP_NPT::SendChangePhase()
 
 void OPvPCapturePointEP_NPT::FillInitialWorldStates(WorldPacket &data)
 {
-    data << EP_NPT_A << uint32(bool(m_TowerState & EP_TS_A));
-    data << EP_NPT_H << uint32(bool(m_TowerState & EP_TS_H));
-    data << EP_NPT_N_A << uint32(bool(m_TowerState & EP_TS_N_A));
-    data << EP_NPT_N_H << uint32(bool(m_TowerState & EP_TS_N_H));
-    data << EP_NPT_N << uint32(bool(m_TowerState & EP_TS_N));
+    data << EP_NPT_A << uint32((m_TowerState & EP_TS_A) != 0);
+    data << EP_NPT_H << uint32((m_TowerState & EP_TS_H) != 0);
+    data << EP_NPT_N_A << uint32((m_TowerState & EP_TS_N_A) != 0);
+    data << EP_NPT_N_H << uint32((m_TowerState & EP_TS_N_H) != 0);
+    data << EP_NPT_N << uint32((m_TowerState & EP_TS_N) != 0);
 }
 
 void OPvPCapturePointEP_NPT::UpdateTowerState()
 {
-    m_PvP->SendUpdateWorldState(EP_NPT_A, bool(m_TowerState & EP_TS_A));
-    m_PvP->SendUpdateWorldState(EP_NPT_H, bool(m_TowerState & EP_TS_H));
-    m_PvP->SendUpdateWorldState(EP_NPT_N_A, bool(m_TowerState & EP_TS_N_A));
-    m_PvP->SendUpdateWorldState(EP_NPT_N_H, bool(m_TowerState & EP_TS_N_H));
-    m_PvP->SendUpdateWorldState(EP_NPT_N, bool(m_TowerState & EP_TS_N));
+    m_PvP->SendUpdateWorldState(EP_NPT_A, (m_TowerState & EP_TS_A) != 0);
+    m_PvP->SendUpdateWorldState(EP_NPT_H, (m_TowerState & EP_TS_H) != 0);
+    m_PvP->SendUpdateWorldState(EP_NPT_N_A, (m_TowerState & EP_TS_N_A) != 0);
+    m_PvP->SendUpdateWorldState(EP_NPT_N_H, (m_TowerState & EP_TS_N_H) != 0);
+    m_PvP->SendUpdateWorldState(EP_NPT_N, (m_TowerState & EP_TS_N) != 0);
 }
 
 bool OPvPCapturePointEP_NPT::HandlePlayerEnter(Player* player)
@@ -391,20 +391,20 @@ void OPvPCapturePointEP_CGT::SendChangePhase()
 
 void OPvPCapturePointEP_CGT::FillInitialWorldStates(WorldPacket &data)
 {
-    data << EP_CGT_A << uint32(bool(m_TowerState & EP_TS_A));
-    data << EP_CGT_H << uint32(bool(m_TowerState & EP_TS_H));
-    data << EP_CGT_N_A << uint32(bool(m_TowerState & EP_TS_N_A));
-    data << EP_CGT_N_H << uint32(bool(m_TowerState & EP_TS_N_H));
-    data << EP_CGT_N << uint32(bool(m_TowerState & EP_TS_N));
+    data << EP_CGT_A << uint32((m_TowerState & EP_TS_A) != 0);
+    data << EP_CGT_H << uint32((m_TowerState & EP_TS_H) != 0);
+    data << EP_CGT_N_A << uint32((m_TowerState & EP_TS_N_A) != 0);
+    data << EP_CGT_N_H << uint32((m_TowerState & EP_TS_N_H) != 0);
+    data << EP_CGT_N << uint32((m_TowerState & EP_TS_N) != 0);
 }
 
 void OPvPCapturePointEP_CGT::UpdateTowerState()
 {
-    m_PvP->SendUpdateWorldState(EP_CGT_A, bool(m_TowerState & EP_TS_A));
-    m_PvP->SendUpdateWorldState(EP_CGT_H, bool(m_TowerState & EP_TS_H));
-    m_PvP->SendUpdateWorldState(EP_CGT_N_A, bool(m_TowerState & EP_TS_N_A));
-    m_PvP->SendUpdateWorldState(EP_CGT_N_H, bool(m_TowerState & EP_TS_N_H));
-    m_PvP->SendUpdateWorldState(EP_CGT_N, bool(m_TowerState & EP_TS_N));
+    m_PvP->SendUpdateWorldState(EP_CGT_A, (m_TowerState & EP_TS_A) != 0);
+    m_PvP->SendUpdateWorldState(EP_CGT_H, (m_TowerState & EP_TS_H) != 0);
+    m_PvP->SendUpdateWorldState(EP_CGT_N_A, (m_TowerState & EP_TS_N_A) != 0);
+    m_PvP->SendUpdateWorldState(EP_CGT_N_H, (m_TowerState & EP_TS_N_H) != 0);
+    m_PvP->SendUpdateWorldState(EP_CGT_N, (m_TowerState & EP_TS_N) != 0);
 }
 
 bool OPvPCapturePointEP_CGT::HandlePlayerEnter(Player* player)
@@ -530,20 +530,20 @@ void OPvPCapturePointEP_PWT::SendChangePhase()
 
 void OPvPCapturePointEP_PWT::FillInitialWorldStates(WorldPacket &data)
 {
-    data << EP_PWT_A << uint32(bool(m_TowerState & EP_TS_A));
-    data << EP_PWT_H << uint32(bool(m_TowerState & EP_TS_H));
-    data << EP_PWT_N_A << uint32(bool(m_TowerState & EP_TS_N_A));
-    data << EP_PWT_N_H << uint32(bool(m_TowerState & EP_TS_N_H));
-    data << EP_PWT_N << uint32(bool(m_TowerState & EP_TS_N));
+    data << EP_PWT_A << uint32((m_TowerState & EP_TS_A) != 0);
+    data << EP_PWT_H << uint32((m_TowerState & EP_TS_H) != 0);
+    data << EP_PWT_N_A << uint32((m_TowerState & EP_TS_N_A) != 0);
+    data << EP_PWT_N_H << uint32((m_TowerState & EP_TS_N_H) != 0);
+    data << EP_PWT_N << uint32((m_TowerState & EP_TS_N) != 0);
 }
 
 void OPvPCapturePointEP_PWT::UpdateTowerState()
 {
-    m_PvP->SendUpdateWorldState(EP_PWT_A, bool(m_TowerState & EP_TS_A));
-    m_PvP->SendUpdateWorldState(EP_PWT_H, bool(m_TowerState & EP_TS_H));
-    m_PvP->SendUpdateWorldState(EP_PWT_N_A, bool(m_TowerState & EP_TS_N_A));
-    m_PvP->SendUpdateWorldState(EP_PWT_N_H, bool(m_TowerState & EP_TS_N_H));
-    m_PvP->SendUpdateWorldState(EP_PWT_N, bool(m_TowerState & EP_TS_N));
+    m_PvP->SendUpdateWorldState(EP_PWT_A, (m_TowerState & EP_TS_A) != 0);
+    m_PvP->SendUpdateWorldState(EP_PWT_H, (m_TowerState & EP_TS_H) != 0);
+    m_PvP->SendUpdateWorldState(EP_PWT_N_A, (m_TowerState & EP_TS_N_A) != 0);
+    m_PvP->SendUpdateWorldState(EP_PWT_N_H, (m_TowerState & EP_TS_N_H) != 0);
+    m_PvP->SendUpdateWorldState(EP_PWT_N, (m_TowerState & EP_TS_N) != 0);
 }
 
 bool OPvPCapturePointEP_PWT::HandlePlayerEnter(Player* player)
@@ -571,7 +571,7 @@ void OPvPCapturePointEP_PWT::SummonFlightMaster(uint32 team)
     {
         m_FlightMasterSpawned = team;
         DelCreature(EP_PWT_FLIGHTMASTER);
-        AddCreature(EP_PWT_FLIGHTMASTER, EP_PWT_FlightMaster.entry, team, EP_PWT_FlightMaster.map, EP_PWT_FlightMaster.x, EP_PWT_FlightMaster.y, EP_PWT_FlightMaster.z, EP_PWT_FlightMaster.o);
+        AddCreature(EP_PWT_FLIGHTMASTER, EP_PWT_FlightMaster.entry, EP_PWT_FlightMaster.map, EP_PWT_FlightMaster.x, EP_PWT_FlightMaster.y, EP_PWT_FlightMaster.z, EP_PWT_FlightMaster.o, OutdoorPvP::GetTeamIdByTeam(team));
         /*
         // sky - we need update gso code
 
@@ -773,7 +773,7 @@ class OutdoorPvP_eastern_plaguelands : public OutdoorPvPScript
         {
         }
 
-        OutdoorPvP* GetOutdoorPvP() const OVERRIDE
+        OutdoorPvP* GetOutdoorPvP() const override
         {
             return new OutdoorPvPEP();
         }

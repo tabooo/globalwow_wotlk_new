@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -28,6 +28,32 @@
 #include "DBCStores.h"
 #include "Item.h"
 #include "AccountMgr.h"
+
+bool WorldSession::CanOpenMailBox(uint64 guid)
+{
+    if (guid == _player->GetGUID())
+    {
+        if (!HasPermission(rbac::RBAC_PERM_COMMAND_MAILBOX))
+        {
+            TC_LOG_WARN("cheat", "%s attempt open mailbox in cheating way.", _player->GetName().c_str());
+            return false;
+        }
+    }
+    else if (IS_GAMEOBJECT_GUID(guid))
+    {
+        if (!_player->GetGameObjectIfCanInteractWith(guid, GAMEOBJECT_TYPE_MAILBOX))
+            return false;
+    }
+    else if (IS_CRE_OR_VEH_OR_PET_GUID(guid))
+    {
+        if (!_player->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_MAILBOX))
+            return false;
+    }
+    else
+        return false;
+
+    return true;
+}
 
 void WorldSession::HandleSendMail(WorldPacket& recvData)
 {
@@ -62,7 +88,7 @@ void WorldSession::HandleSendMail(WorldPacket& recvData)
 
     // packet read complete, now do check
 
-    if (!GetPlayer()->GetGameObjectIfCanInteractWith(mailbox, GAMEOBJECT_TYPE_MAILBOX))
+    if (!CanOpenMailBox(mailbox))
         return;
 
     if (receiverName.empty())
@@ -104,6 +130,13 @@ void WorldSession::HandleSendMail(WorldPacket& recvData)
     uint32 cost = items_count ? 30 * items_count : 30;  // price hardcoded in client
 
     uint32 reqmoney = cost + money;
+
+    // Check for overflow
+    if (reqmoney < money)
+    {
+        player->SendMailResult(0, MAIL_SEND, MAIL_ERR_NOT_ENOUGH_MONEY);
+        return;
+    }
 
     if (!player->HasEnoughMoney(reqmoney) && !player->IsGameMaster())
     {
@@ -289,6 +322,10 @@ void WorldSession::HandleSendMail(WorldPacket& recvData)
     // If theres is an item, there is a one hour delivery delay if sent to another account's character.
     uint32 deliver_delay = needItemDelay ? sWorld->getIntConfig(CONFIG_MAIL_DELIVERY_DELAY) : 0;
 
+    // don't ask for COD if there are no items
+    if (items_count == 0)
+        COD = 0;
+
     // will delete item or place to receiver mail list
     draft
         .AddMoney(money)
@@ -307,12 +344,12 @@ void WorldSession::HandleMailMarkAsRead(WorldPacket& recvData)
     recvData >> mailbox;
     recvData >> mailId;
 
-    if (!GetPlayer()->GetGameObjectIfCanInteractWith(mailbox, GAMEOBJECT_TYPE_MAILBOX))
+    if (!CanOpenMailBox(mailbox))
         return;
 
     Player* player = _player;
     Mail* m = player->GetMail(mailId);
-    if (m)
+    if (m && m->state != MAIL_STATE_DELETED)
     {
         if (player->unReadMails)
             --player->unReadMails;
@@ -331,7 +368,7 @@ void WorldSession::HandleMailDelete(WorldPacket& recvData)
     recvData >> mailId;
     recvData.read_skip<uint32>();                          // mailTemplateId
 
-    if (!GetPlayer()->GetGameObjectIfCanInteractWith(mailbox, GAMEOBJECT_TYPE_MAILBOX))
+    if (!CanOpenMailBox(mailbox))
         return;
 
     Mail* m = _player->GetMail(mailId);
@@ -359,7 +396,7 @@ void WorldSession::HandleMailReturnToSender(WorldPacket& recvData)
     recvData >> mailId;
     recvData.read_skip<uint64>();                          // original sender GUID for return to, not used
 
-    if (!GetPlayer()->GetGameObjectIfCanInteractWith(mailbox, GAMEOBJECT_TYPE_MAILBOX))
+    if (!CanOpenMailBox(mailbox))
         return;
 
     Player* player = _player;
@@ -424,13 +461,20 @@ void WorldSession::HandleMailTakeItem(WorldPacket& recvData)
     recvData >> mailId;
     recvData >> itemId;                                    // item guid low
 
-    if (!GetPlayer()->GetGameObjectIfCanInteractWith(mailbox, GAMEOBJECT_TYPE_MAILBOX))
+    if (!CanOpenMailBox(mailbox))
         return;
 
     Player* player = _player;
 
     Mail* m = player->GetMail(mailId);
     if (!m || m->state == MAIL_STATE_DELETED || m->deliver_time > time(NULL))
+    {
+        player->SendMailResult(mailId, MAIL_ITEM_TAKEN, MAIL_ERR_INTERNAL_ERROR);
+        return;
+    }
+
+    // verify that the mail has the item to avoid cheaters taking COD items without paying
+    if (std::find_if(m->items.begin(), m->items.end(), [itemId](MailItemInfo info){ return info.item_guid == itemId; }) == m->items.end())
     {
         player->SendMailResult(mailId, MAIL_ITEM_TAKEN, MAIL_ERR_INTERNAL_ERROR);
         return;
@@ -518,7 +562,7 @@ void WorldSession::HandleMailTakeMoney(WorldPacket& recvData)
     recvData >> mailbox;
     recvData >> mailId;
 
-    if (!GetPlayer()->GetGameObjectIfCanInteractWith(mailbox, GAMEOBJECT_TYPE_MAILBOX))
+    if (!CanOpenMailBox(mailbox))
         return;
 
     Player* player = _player;
@@ -555,7 +599,7 @@ void WorldSession::HandleGetMailList(WorldPacket& recvData)
     uint64 mailbox;
     recvData >> mailbox;
 
-    if (!GetPlayer()->GetGameObjectIfCanInteractWith(mailbox, GAMEOBJECT_TYPE_MAILBOX))
+    if (!CanOpenMailBox(mailbox))
         return;
 
     Player* player = _player;
@@ -678,13 +722,13 @@ void WorldSession::HandleMailCreateTextItem(WorldPacket& recvData)
     recvData >> mailbox;
     recvData >> mailId;
 
-    if (!GetPlayer()->GetGameObjectIfCanInteractWith(mailbox, GAMEOBJECT_TYPE_MAILBOX))
+    if (!CanOpenMailBox(mailbox))
         return;
 
     Player* player = _player;
 
     Mail* m = player->GetMail(mailId);
-    if (!m || (m->body.empty() && !m->mailTemplateId) || m->state == MAIL_STATE_DELETED || m->deliver_time > time(NULL))
+    if (!m || (m->body.empty() && !m->mailTemplateId) || m->state == MAIL_STATE_DELETED || m->deliver_time > time(NULL) || (m->checked & MAIL_CHECK_MASK_COPIED))
     {
         player->SendMailResult(mailId, MAIL_MADE_PERMANENT, MAIL_ERR_INTERNAL_ERROR);
         return;

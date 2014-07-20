@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -835,26 +835,6 @@ namespace Trinity
             float i_range;
     };
 
-    class AnyUnfriendlyAttackableVisibleUnitInObjectRangeCheck
-    {
-        public:
-            AnyUnfriendlyAttackableVisibleUnitInObjectRangeCheck(Unit const* funit, float range)
-                : i_funit(funit), i_range(range) { }
-
-            bool operator()(const Unit* u)
-            {
-                return u->IsAlive()
-                    && i_funit->IsWithinDistInMap(u, i_range)
-                    && !i_funit->IsFriendlyTo(u)
-                    && i_funit->IsValidAttackTarget(u)
-                    && u->GetCreatureType() != CREATURE_TYPE_CRITTER
-                    && i_funit->CanSeeOrDetect(u);
-            }
-        private:
-            Unit const* i_funit;
-            float i_range;
-    };
-
     class CreatureWithDbGUIDCheck
     {
         public:
@@ -964,13 +944,13 @@ namespace Trinity
                 if (owner)
                     check = owner;
                 i_targetForPlayer = (check->GetTypeId() == TYPEID_PLAYER);
-                if (i_obj->GetTypeId() == TYPEID_DYNAMICOBJECT)
-                    _spellInfo = sSpellMgr->GetSpellInfo(((DynamicObject*)i_obj)->GetSpellId());
+                if (DynamicObject const* dynObj = i_obj->ToDynObject())
+                    _spellInfo = sSpellMgr->GetSpellInfo(dynObj->GetSpellId());
             }
             bool operator()(Unit* u)
             {
                 // Check contains checks for: live, non-selectable, non-attackable flags, flight check and GM check, ignore totems
-                if (u->GetTypeId() == TYPEID_UNIT && ((Creature*)u)->IsTotem())
+                if (u->GetTypeId() == TYPEID_UNIT && u->ToCreature()->IsTotem())
                     return false;
 
                 if (i_funit->_IsValidAttackTarget(u, _spellInfo, i_obj->GetTypeId() == TYPEID_DYNAMICOBJECT ? i_obj : NULL) && i_obj->IsWithinDistInMap(u, i_range))

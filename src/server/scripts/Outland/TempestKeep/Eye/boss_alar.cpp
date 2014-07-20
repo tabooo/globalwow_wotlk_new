@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -107,10 +107,9 @@ class boss_alar : public CreatureScript
 
             int8 cur_wp;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
-                if (instance)
-                    instance->SetData(DATA_ALAREVENT, NOT_STARTED);
+                instance->SetData(DATA_ALAREVENT, NOT_STARTED);
 
                 Berserk_Timer = 1200000;
                 Platforms_Move_Timer = 0;
@@ -134,32 +133,30 @@ class boss_alar : public CreatureScript
                 me->setActive(false);
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
-                if (instance)
-                    instance->SetData(DATA_ALAREVENT, IN_PROGRESS);
+                instance->SetData(DATA_ALAREVENT, IN_PROGRESS);
 
                 me->SetDisableGravity(true); // after enterevademode will be set walk movement
                 DoZoneInCombat();
                 me->setActive(true);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
-                if (instance)
-                    instance->SetData(DATA_ALAREVENT, DONE);
+                instance->SetData(DATA_ALAREVENT, DONE);
             }
 
-            void JustSummoned(Creature* summon) OVERRIDE
+            void JustSummoned(Creature* summon) override
             {
                 if (summon->GetEntry() == CREATURE_EMBER_OF_ALAR)
                     if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
                         summon->AI()->AttackStart(target);
             }
 
-            void MoveInLineOfSight(Unit* /*who*/) OVERRIDE { }
+            void MoveInLineOfSight(Unit* /*who*/) override { }
 
-            void AttackStart(Unit* who) OVERRIDE
+            void AttackStart(Unit* who) override
             {
                 if (Phase1)
                     AttackStartNoMove(who);
@@ -167,7 +164,7 @@ class boss_alar : public CreatureScript
                     ScriptedAI::AttackStart(who);
             }
 
-            void DamageTaken(Unit* /*killer*/, uint32 &damage) OVERRIDE
+            void DamageTaken(Unit* /*killer*/, uint32 &damage) override
             {
                 if (damage >= me->GetHealth() && Phase1)
                 {
@@ -189,7 +186,7 @@ class boss_alar : public CreatureScript
                 }
             }
 
-            void SpellHit(Unit*, const SpellInfo* spell) OVERRIDE
+            void SpellHit(Unit*, const SpellInfo* spell) override
             {
                 if (spell->Id == SPELL_DIVE_BOMB_VISUAL)
                 {
@@ -199,7 +196,7 @@ class boss_alar : public CreatureScript
                 }
             }
 
-            void MovementInform(uint32 type, uint32 /*id*/) OVERRIDE
+            void MovementInform(uint32 type, uint32 /*id*/) override
             {
                 if (type == POINT_MOTION_TYPE)
                 {
@@ -209,7 +206,7 @@ class boss_alar : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!me->IsInCombat()) // sometimes IsInCombat but !incombat, faction bug?
                     return;
@@ -426,7 +423,7 @@ class boss_alar : public CreatureScript
 
             void DoMeleeAttackIfReady()
             {
-                if (me->isAttackReady() && !me->IsNonMeleeSpellCasted(false))
+                if (me->isAttackReady() && !me->IsNonMeleeSpellCast(false))
                 {
                     if (me->IsWithinMeleeRange(me->GetVictim()))
                     {
@@ -438,7 +435,7 @@ class boss_alar : public CreatureScript
                         Unit* target = NULL;
                         target = me->SelectNearestTargetInAttackDistance(5);
                         if (target)
-                            me->AI()->AttackStart(target);
+                            AttackStart(target);
                         else
                         {
                             DoCast(me, SPELL_FLAME_BUFFET, true);
@@ -449,9 +446,9 @@ class boss_alar : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
-            return new boss_alarAI(creature);
+            return GetInstanceAI<boss_alarAI>(creature);
         }
 };
 
@@ -472,22 +469,22 @@ class npc_ember_of_alar : public CreatureScript
             InstanceScript* instance;
             bool toDie;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 toDie = false;
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 DoZoneInCombat();
             }
 
-            void EnterEvadeMode() OVERRIDE
+            void EnterEvadeMode() override
             {
                 me->setDeathState(JUST_DIED);
             }
 
-            void DamageTaken(Unit* killer, uint32 &damage) OVERRIDE
+            void DamageTaken(Unit* killer, uint32& damage) override
             {
                 if (damage >= me->GetHealth() && killer != me && !toDie)
                 {
@@ -495,9 +492,9 @@ class npc_ember_of_alar : public CreatureScript
                     DoCast(me, SPELL_EMBER_BLAST, true);
                     me->SetDisplayId(11686);
                     me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                    if (instance && instance->GetData(DATA_ALAREVENT) == 2)
+                    if (instance->GetData(DATA_ALAREVENT) == 2)
                     {
-                        if (Unit* Alar = Unit::GetUnit(*me, instance->GetData64(DATA_ALAR)))
+                        if (Unit* Alar = ObjectAccessor::GetUnit(*me, instance->GetData64(DATA_ALAR)))
                         {
                             int32 AlarHealth = int32(Alar->GetHealth()) - int32(Alar->CountPctFromMaxHealth(3));
                             if (AlarHealth > 0)
@@ -510,7 +507,7 @@ class npc_ember_of_alar : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE
+            void UpdateAI(uint32 /*diff*/) override
             {
                 if (!UpdateVictim())
                     return;
@@ -526,9 +523,9 @@ class npc_ember_of_alar : public CreatureScript
 
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
-            return new npc_ember_of_alarAI(creature);
+            return GetInstanceAI<npc_ember_of_alarAI>(creature);
         }
 };
 
@@ -540,15 +537,15 @@ class npc_flame_patch_alar : public CreatureScript
         struct npc_flame_patch_alarAI : public ScriptedAI
         {
             npc_flame_patch_alarAI(Creature* creature) : ScriptedAI(creature) { }
-            void Reset() OVERRIDE { }
-            void EnterCombat(Unit* /*who*/) OVERRIDE { }
-            void AttackStart(Unit* /*who*/) OVERRIDE { }
-            void MoveInLineOfSight(Unit* /*who*/) OVERRIDE { }
+            void Reset() override { }
+            void EnterCombat(Unit* /*who*/) override { }
+            void AttackStart(Unit* /*who*/) override { }
+            void MoveInLineOfSight(Unit* /*who*/) override { }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE { }
+            void UpdateAI(uint32 /*diff*/) override { }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_flame_patch_alarAI(creature);
         }

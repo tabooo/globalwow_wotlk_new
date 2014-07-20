@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,13 +18,8 @@
 #ifndef BATTLEFIELD_H_
 #define BATTLEFIELD_H_
 
-#include "Utilities/Util.h"
 #include "SharedDefines.h"
 #include "ZoneScript.h"
-#include "WorldPacket.h"
-#include "GameObject.h"
-#include "Battleground.h"
-#include "ObjectAccessor.h"
 
 enum BattlefieldTypes
 {
@@ -110,7 +105,7 @@ class BfCapturePoint
         bool DelCapturePoint();
 
         // active Players in the area of the objective, 0 - alliance, 1 - horde
-        GuidSet m_activePlayers[2];
+        GuidSet m_activePlayers[BG_TEAMS_COUNT];
 
         // Total shift needed to capture the objective
         float m_maxValue;
@@ -173,7 +168,7 @@ class BfGraveyard
         // Check if this graveyard has a spirit guide
         bool HasNpc(uint64 guid);
 
-        // Check if a player is in this graveyard's ressurect queue
+        // Check if a player is in this graveyard's resurrect queue
         bool HasPlayer(uint64 guid) { return m_ResurrectQueue.find(guid) != m_ResurrectQueue.end(); }
 
         // Get the graveyard's ID.
@@ -182,7 +177,7 @@ class BfGraveyard
     protected:
         TeamId m_ControlTeam;
         uint32 m_GraveyardId;
-        uint64 m_SpiritGuide[2];
+        uint64 m_SpiritGuide[BG_TEAMS_COUNT];
         GuidSet m_ResurrectQueue;
         Battlefield* m_Bf;
 };
@@ -285,8 +280,8 @@ class Battlefield : public ZoneScript
         BfGraveyard* GetGraveyardById(uint32 id) const;
 
         // Misc methods
-        Creature* SpawnCreature(uint32 entry, float x, float y, float z, float o, TeamId team);
-        Creature* SpawnCreature(uint32 entry, const Position& pos, TeamId team);
+        virtual Creature* SpawnCreature(uint32 entry, float x, float y, float z, float o, TeamId /*teamId*/);
+        Creature* SpawnCreature(uint32 entry, Position const& pos, TeamId /*teamId*/);
         GameObject* SpawnGameObject(uint32 entry, float x, float y, float z, float o);
 
         Creature* GetCreature(uint64 GUID);
@@ -309,9 +304,7 @@ class Battlefield : public ZoneScript
         /// Called when a player enter in battlefield zone
         virtual void OnPlayerEnterZone(Player* /*player*/) { }
 
-        WorldPacket BuildWarningAnnPacket(std::string const& msg);
         void SendWarningToAllInZone(uint32 entry);
-        //void SendWarningToAllInWar(int32 entry, ...); -- UNUSED
         void SendWarningToPlayer(Player* player, uint32 entry);
 
         void PlayerAcceptInviteToQueue(Player* player);
@@ -346,7 +339,7 @@ class Battlefield : public ZoneScript
         void InvitePlayerToQueue(Player* player);
         void InvitePlayerToWar(Player* player);
 
-        void InitStalker(uint32 entry, float x, float y, float z, float o);
+        void InitStalker(uint32 entry, Position const& pos);
 
     protected:
         uint64 StalkerGuid;
@@ -385,7 +378,7 @@ class Battlefield : public ZoneScript
 
         // Graveyard variables
         GraveyardVect m_GraveyardList;                          // Vector witch contain the different GY of the battle
-        uint32 m_LastResurectTimer;                             // Timer for resurect player every 30 sec
+        uint32 m_LastResurrectTimer;                            // Timer for resurrect player every 30 sec
 
         uint32 m_StartGroupingTimer;                            // Timer for invite players in area 15 minute before start battle
         bool m_StartGrouping;                                   // bool for know if all players in area has been invited

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -175,21 +175,20 @@ class boss_gothik : public CreatureScript
             std::vector<uint64> LiveTriggerGUID;
             std::vector<uint64> DeadTriggerGUID;
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 LiveTriggerGUID.clear();
                 DeadTriggerGUID.clear();
 
                 me->SetReactState(REACT_PASSIVE);
-                if (instance)
-                    instance->SetData(DATA_GOTHIK_GATE, GO_STATE_ACTIVE);
+                instance->SetData(DATA_GOTHIK_GATE, GO_STATE_ACTIVE);
                 _Reset();
                 mergedSides = false;
                 phaseTwo = false;
                 thirtyPercentReached = false;
             }
 
-            void EnterCombat(Unit* /*who*/) OVERRIDE
+            void EnterCombat(Unit* /*who*/) override
             {
                 for (uint32 i = 0; i < POS_LIVE; ++i)
                     if (Creature* trigger = DoSummon(WORLD_TRIGGER, PosSummonLive[i]))
@@ -210,11 +209,10 @@ class boss_gothik : public CreatureScript
                 events.ScheduleEvent(EVENT_SUMMON, 30000);
                 DoTeleportTo(PosPlatform);
                 Talk(SAY_SPEECH);
-                if (instance)
-                    instance->SetData(DATA_GOTHIK_GATE, GO_STATE_READY);
+                instance->SetData(DATA_GOTHIK_GATE, GO_STATE_READY);
             }
 
-            void JustSummoned(Creature* summon) OVERRIDE
+            void JustSummoned(Creature* summon) override
             {
                 if (summon->GetEntry() == WORLD_TRIGGER)
                     summon->setActive(true);
@@ -231,25 +229,24 @@ class boss_gothik : public CreatureScript
                 summons.Summon(summon);
             }
 
-            void SummonedCreatureDespawn(Creature* summon) OVERRIDE
+            void SummonedCreatureDespawn(Creature* summon) override
             {
                 summons.Despawn(summon);
             }
 
-            void KilledUnit(Unit* /*victim*/) OVERRIDE
+            void KilledUnit(Unit* /*victim*/) override
             {
                 if (!(rand()%5))
                     Talk(SAY_KILL);
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 LiveTriggerGUID.clear();
                 DeadTriggerGUID.clear();
                 _JustDied();
                 Talk(SAY_DEATH);
-                if (instance)
-                    instance->SetData(DATA_GOTHIK_GATE, GO_STATE_ACTIVE);
+                instance->SetData(DATA_GOTHIK_GATE, GO_STATE_ACTIVE);
             }
 
             void DoGothikSummon(uint32 entry)
@@ -260,25 +257,25 @@ class boss_gothik : public CreatureScript
                     {
                         case NPC_LIVE_TRAINEE:
                         {
-                            if (Creature* liveTrigger = Unit::GetCreature(*me, LiveTriggerGUID[0]))
+                            if (Creature* liveTrigger = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[0]))
                                 DoSummon(NPC_LIVE_TRAINEE, liveTrigger, 1);
-                            if (Creature* liveTrigger1 = Unit::GetCreature(*me, LiveTriggerGUID[1]))
+                            if (Creature* liveTrigger1 = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[1]))
                                 DoSummon(NPC_LIVE_TRAINEE, liveTrigger1, 1);
-                            if (Creature* liveTrigger2 = Unit::GetCreature(*me, LiveTriggerGUID[2]))
+                            if (Creature* liveTrigger2 = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[2]))
                                 DoSummon(NPC_LIVE_TRAINEE, liveTrigger2, 1);
                             break;
                         }
                         case NPC_LIVE_KNIGHT:
                         {
-                            if (Creature* liveTrigger3 = Unit::GetCreature(*me, LiveTriggerGUID[3]))
+                            if (Creature* liveTrigger3 = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[3]))
                                 DoSummon(NPC_LIVE_KNIGHT, liveTrigger3, 1);
-                            if (Creature* liveTrigger5 = Unit::GetCreature(*me, LiveTriggerGUID[5]))
+                            if (Creature* liveTrigger5 = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[5]))
                                 DoSummon(NPC_LIVE_KNIGHT, liveTrigger5, 1);
                             break;
                         }
                         case NPC_LIVE_RIDER:
                         {
-                            if (Creature* liveTrigger4 = Unit::GetCreature(*me, LiveTriggerGUID[4]))
+                            if (Creature* liveTrigger4 = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[4]))
                                 DoSummon(NPC_LIVE_RIDER, liveTrigger4, 1);
                             break;
                         }
@@ -290,21 +287,21 @@ class boss_gothik : public CreatureScript
                     {
                         case NPC_LIVE_TRAINEE:
                         {
-                            if (Creature* liveTrigger = Unit::GetCreature(*me, LiveTriggerGUID[4]))
+                            if (Creature* liveTrigger = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[4]))
                                 DoSummon(NPC_LIVE_TRAINEE, liveTrigger, 1);
-                            if (Creature* liveTrigger2 = Unit::GetCreature(*me, LiveTriggerGUID[4]))
+                            if (Creature* liveTrigger2 = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[4]))
                                 DoSummon(NPC_LIVE_TRAINEE, liveTrigger2, 1);
                             break;
                         }
                         case NPC_LIVE_KNIGHT:
                         {
-                            if (Creature* liveTrigger5 = Unit::GetCreature(*me, LiveTriggerGUID[4]))
+                            if (Creature* liveTrigger5 = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[4]))
                                 DoSummon(NPC_LIVE_KNIGHT, liveTrigger5, 1);
                             break;
                         }
                         case NPC_LIVE_RIDER:
                         {
-                            if (Creature* liveTrigger4 = Unit::GetCreature(*me, LiveTriggerGUID[4]))
+                            if (Creature* liveTrigger4 = ObjectAccessor::GetCreature(*me, LiveTriggerGUID[4]))
                                 DoSummon(NPC_LIVE_RIDER, liveTrigger4, 1);
                             break;
                         }
@@ -350,7 +347,7 @@ class boss_gothik : public CreatureScript
                 return false;
             }
 
-            void SpellHit(Unit* /*caster*/, SpellInfo const* spell) OVERRIDE
+            void SpellHit(Unit* /*caster*/, SpellInfo const* spell) override
             {
                 uint32 spellId = 0;
                 switch (spell->Id)
@@ -362,18 +359,18 @@ class boss_gothik : public CreatureScript
                 if (spellId && me->IsInCombat())
                 {
                     me->HandleEmoteCommand(EMOTE_ONESHOT_SPELL_CAST);
-                    if (Creature* pRandomDeadTrigger = Unit::GetCreature(*me, DeadTriggerGUID[rand() % POS_DEAD]))
+                    if (Creature* pRandomDeadTrigger = ObjectAccessor::GetCreature(*me, DeadTriggerGUID[rand() % POS_DEAD]))
                         me->CastSpell(pRandomDeadTrigger, spellId, true);
                 }
             }
 
-            void DamageTaken(Unit* /*who*/, uint32& damage) OVERRIDE
+            void DamageTaken(Unit* /*who*/, uint32& damage) override
             {
                 if (!phaseTwo)
                     damage = 0;
             }
 
-            void SpellHitTarget(Unit* target, SpellInfo const* spell) OVERRIDE
+            void SpellHitTarget(Unit* target, SpellInfo const* spell) override
             {
                 if (!me->IsInCombat())
                     return;
@@ -393,7 +390,7 @@ class boss_gothik : public CreatureScript
                 }
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (!UpdateVictim() || !CheckInRoom())
                     return;
@@ -403,8 +400,7 @@ class boss_gothik : public CreatureScript
                 if (!thirtyPercentReached && HealthBelowPct(30) && phaseTwo)
                 {
                     thirtyPercentReached = true;
-                    if (instance)
-                        instance->SetData(DATA_GOTHIK_GATE, GO_STATE_ACTIVE);
+                    instance->SetData(DATA_GOTHIK_GATE, GO_STATE_ACTIVE);
                 }
 
                 if (me->HasUnitState(UNIT_STATE_CASTING))
@@ -429,8 +425,7 @@ class boss_gothik : public CreatureScript
                                 {
                                     if (!CheckGroupSplitted())
                                     {
-                                        if (instance)
-                                            instance->SetData(DATA_GOTHIK_GATE, GO_STATE_ACTIVE);
+                                        instance->SetData(DATA_GOTHIK_GATE, GO_STATE_ACTIVE);
                                         DummyEntryCheckPredicate pred;
                                         summons.DoAction(0, pred);  //! Magic numbers fail
                                         summons.DoZoneInCombat();
@@ -498,9 +493,9 @@ class boss_gothik : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
-            return new boss_gothikAI(creature);
+            return GetInstanceAI<boss_gothikAI>(creature);
         }
 };
 
@@ -514,6 +509,7 @@ class npc_gothik_minion : public CreatureScript
             npc_gothik_minionAI(Creature* creature) : CombatAI(creature)
             {
                 liveSide = IN_LIVE_SIDE(me);
+                gateClose = false;
             }
 
             bool liveSide;
@@ -524,25 +520,25 @@ class npc_gothik_minion : public CreatureScript
                 return (liveSide == IN_LIVE_SIDE(who));
             }
 
-            void DoAction(int32 param) OVERRIDE
+            void DoAction(int32 param) override
             {
-                gateClose = param;
+                gateClose = param != 0;
             }
 
-            void DamageTaken(Unit* attacker, uint32 &damage) OVERRIDE
+            void DamageTaken(Unit* attacker, uint32 &damage) override
             {
                 if (gateClose && !isOnSameSide(attacker))
                     damage = 0;
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
                 if (me->IsSummon())
                     if (Unit* owner = me->ToTempSummon()->GetSummoner())
                         CombatAI::JustDied(owner);
             }
 
-            void EnterEvadeMode() OVERRIDE
+            void EnterEvadeMode() override
             {
                 if (!gateClose)
                 {
@@ -574,7 +570,7 @@ class npc_gothik_minion : public CreatureScript
                 Reset();
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (gateClose && (!isOnSameSide(me) || (me->GetVictim() && !isOnSameSide(me->GetVictim()))))
                 {
@@ -586,7 +582,7 @@ class npc_gothik_minion : public CreatureScript
             }
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
             return new npc_gothik_minionAI(creature);
         }
@@ -606,13 +602,13 @@ class spell_gothik_shadow_bolt_volley : public SpellScriptLoader
                 targets.remove_if(Trinity::UnitAuraCheck(false, SPELL_SHADOW_MARK));
             }
 
-            void Register() OVERRIDE
+            void Register() override
             {
                 OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_gothik_shadow_bolt_volley_SpellScript::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const override
         {
             return new spell_gothik_shadow_bolt_volley_SpellScript();
         }

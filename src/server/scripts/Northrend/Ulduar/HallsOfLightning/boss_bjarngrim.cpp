@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -97,9 +97,9 @@ class boss_bjarngrim : public CreatureScript
 public:
     boss_bjarngrim() : CreatureScript("boss_bjarngrim") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new boss_bjarngrimAI(creature);
+        return GetInstanceAI<boss_bjarngrimAI>(creature);
     }
 
     struct boss_bjarngrimAI : public ScriptedAI
@@ -137,7 +137,7 @@ public:
 
         uint64 m_auiStormforgedLieutenantGUID[2];
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             if (canBuff)
                 if (!me->HasAura(SPELL_TEMPORARY_ELECTRICAL_CHARGE))
@@ -164,11 +164,9 @@ public:
 
             for (uint8 i = 0; i < 2; ++i)
             {
-                if (Creature* pStormforgedLieutenant = (Unit::GetCreature((*me), m_auiStormforgedLieutenantGUID[i])))
-                {
+                if (Creature* pStormforgedLieutenant = ObjectAccessor::GetCreature(*me, m_auiStormforgedLieutenantGUID[i]))
                     if (!pStormforgedLieutenant->IsAlive())
                         pStormforgedLieutenant->Respawn();
-                }
             }
 
             if (m_uiStance != STANCE_DEFENSIVE)
@@ -180,11 +178,10 @@ public:
 
             SetEquipmentSlots(false, EQUIP_SWORD, EQUIP_SHIELD, EQUIP_NO_CHANGE);
 
-            if (instance)
-                instance->SetBossState(DATA_BJARNGRIM, NOT_STARTED);
+            instance->SetBossState(DATA_BJARNGRIM, NOT_STARTED);
         }
 
-        void EnterEvadeMode() OVERRIDE
+        void EnterEvadeMode() override
         {
             if (me->HasAura(SPELL_TEMPORARY_ELECTRICAL_CHARGE))
                 canBuff = true;
@@ -194,28 +191,26 @@ public:
             ScriptedAI::EnterEvadeMode();
         }
 
-        void EnterCombat(Unit* /*who*/) OVERRIDE
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
 
             //must get both lieutenants here and make sure they are with him
             me->CallForHelp(30.0f);
 
-            if (instance)
-                instance->SetBossState(DATA_BJARNGRIM, IN_PROGRESS);
+            instance->SetBossState(DATA_BJARNGRIM, IN_PROGRESS);
         }
 
-        void KilledUnit(Unit* /*victim*/) OVERRIDE
+        void KilledUnit(Unit* /*victim*/) override
         {
             Talk(SAY_SLAY);
         }
 
-        void JustDied(Unit* /*killer*/) OVERRIDE
+        void JustDied(Unit* /*killer*/) override
         {
             Talk(SAY_DEATH);
 
-            if (instance)
-                instance->SetBossState(DATA_BJARNGRIM, DONE);
+            instance->SetBossState(DATA_BJARNGRIM, DONE);
         }
 
         /// @todo remove when removal is done by the core
@@ -235,7 +230,7 @@ public:
             }
         }
 
-        void UpdateAI(uint32 uiDiff) OVERRIDE
+        void UpdateAI(uint32 uiDiff) override
         {
             //Return since we have no target
             if (!UpdateVictim())
@@ -245,7 +240,7 @@ public:
             if (m_uiChangeStance_Timer <= uiDiff)
             {
                 //wait for current spell to finish before change stance
-                if (me->IsNonMeleeSpellCasted(false))
+                if (me->IsNonMeleeSpellCast(false))
                     return;
 
                 DoRemoveStanceAura(m_uiStance);
@@ -389,9 +384,9 @@ class npc_stormforged_lieutenant : public CreatureScript
 public:
     npc_stormforged_lieutenant() : CreatureScript("npc_stormforged_lieutenant") { }
 
-    CreatureAI* GetAI(Creature* creature) const OVERRIDE
+    CreatureAI* GetAI(Creature* creature) const override
     {
-        return new npc_stormforged_lieutenantAI(creature);
+        return GetInstanceAI<npc_stormforged_lieutenantAI>(creature);
     }
 
     struct npc_stormforged_lieutenantAI : public ScriptedAI
@@ -406,25 +401,22 @@ public:
         uint32 m_uiArcWeld_Timer;
         uint32 m_uiRenewSteel_Timer;
 
-        void Reset() OVERRIDE
+        void Reset() override
         {
             m_uiArcWeld_Timer = urand(20000, 21000);
             m_uiRenewSteel_Timer = urand(10000, 11000);
         }
 
-        void EnterCombat(Unit* who) OVERRIDE
+        void EnterCombat(Unit* who) override
         {
-            if (instance)
+            if (Creature* pBjarngrim = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_BJARNGRIM)))
             {
-                if (Creature* pBjarngrim = instance->instance->GetCreature(instance->GetData64(DATA_BJARNGRIM)))
-                {
-                    if (pBjarngrim->IsAlive() && !pBjarngrim->GetVictim())
-                        pBjarngrim->AI()->AttackStart(who);
-                }
+                if (pBjarngrim->IsAlive() && !pBjarngrim->GetVictim())
+                    pBjarngrim->AI()->AttackStart(who);
             }
         }
 
-        void UpdateAI(uint32 uiDiff) OVERRIDE
+        void UpdateAI(uint32 uiDiff) override
         {
             //Return since we have no target
             if (!UpdateVictim())
@@ -440,13 +432,10 @@ public:
 
             if (m_uiRenewSteel_Timer <= uiDiff)
             {
-                if (instance)
+                if (Creature* pBjarngrim = ObjectAccessor::GetCreature(*me, instance->GetData64(DATA_BJARNGRIM)))
                 {
-                    if (Creature* pBjarngrim = instance->instance->GetCreature(instance->GetData64(DATA_BJARNGRIM)))
-                    {
-                        if (pBjarngrim->IsAlive())
-                            DoCast(pBjarngrim, SPELL_RENEW_STEEL_N);
-                    }
+                    if (pBjarngrim->IsAlive())
+                        DoCast(pBjarngrim, SPELL_RENEW_STEEL_N);
                 }
                 m_uiRenewSteel_Timer = urand(10000, 14000);
             }

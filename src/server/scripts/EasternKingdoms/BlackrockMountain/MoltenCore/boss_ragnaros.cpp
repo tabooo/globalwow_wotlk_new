@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -87,7 +87,7 @@ class boss_ragnaros : public CreatureScript
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
             }
 
-            void Reset() OVERRIDE
+            void Reset() override
             {
                 BossAI::Reset();
                 _emergeTimer = 90000;
@@ -97,7 +97,7 @@ class boss_ragnaros : public CreatureScript
                 me->SetUInt32Value(UNIT_NPC_EMOTESTATE, 0);
             }
 
-            void EnterCombat(Unit* victim) OVERRIDE
+            void EnterCombat(Unit* victim) override
             {
                 BossAI::EnterCombat(victim);
                 events.ScheduleEvent(EVENT_ERUPTION, 15000);
@@ -109,13 +109,13 @@ class boss_ragnaros : public CreatureScript
                 events.ScheduleEvent(EVENT_SUBMERGE, 180000);
             }
 
-            void KilledUnit(Unit* /*victim*/) OVERRIDE
+            void KilledUnit(Unit* /*victim*/) override
             {
                 if (urand(0, 99) < 25)
                     Talk(SAY_KILL);
             }
 
-            void UpdateAI(uint32 diff) OVERRIDE
+            void UpdateAI(uint32 diff) override
             {
                 if (_introState != 2)
                 {
@@ -147,9 +147,8 @@ class boss_ragnaros : public CreatureScript
                             break;
                         case EVENT_INTRO_4:
                             Talk(SAY_ARRIVAL5_RAG);
-                            if (instance)
-                                if (Creature* executus = Unit::GetCreature(*me, instance->GetData64(BOSS_MAJORDOMO_EXECUTUS)))
-                                    me->Kill(executus);
+                            if (Creature* executus = ObjectAccessor::GetCreature(*me, instance->GetData64(BOSS_MAJORDOMO_EXECUTUS)))
+                                me->Kill(executus);
                             break;
                         case EVENT_INTRO_5:
                             me->SetReactState(REACT_AGGRESSIVE);
@@ -163,29 +162,26 @@ class boss_ragnaros : public CreatureScript
                 }
                 else
                 {
-                    if (instance)
+                    if (_isBanished && ((_emergeTimer <= diff) || (instance->GetData(DATA_RAGNAROS_ADDS)) > 8))
                     {
-                        if (_isBanished && ((_emergeTimer <= diff) || (instance->GetData(DATA_RAGNAROS_ADDS)) > 8))
-                        {
-                            //Become unbanished again
-                            me->SetReactState(REACT_AGGRESSIVE);
-                            me->setFaction(14);
-                            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-                            me->SetUInt32Value(UNIT_NPC_EMOTESTATE, 0);
-                            me->HandleEmoteCommand(EMOTE_ONESHOT_EMERGE);
-                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                                AttackStart(target);
-                            instance->SetData(DATA_RAGNAROS_ADDS, 0);
+                        //Become unbanished again
+                        me->SetReactState(REACT_AGGRESSIVE);
+                        me->setFaction(14);
+                        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                        me->SetUInt32Value(UNIT_NPC_EMOTESTATE, 0);
+                        me->HandleEmoteCommand(EMOTE_ONESHOT_EMERGE);
+                        if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
+                            AttackStart(target);
+                        instance->SetData(DATA_RAGNAROS_ADDS, 0);
 
-                            //DoCast(me, SPELL_RAGEMERGE); //"phase spells" didnt worked correctly so Ive commented them and wrote solution witch doesnt need core support
-                            _isBanished = false;
-                        }
-                        else if (_isBanished)
-                        {
-                            _emergeTimer -= diff;
-                            //Do nothing while banished
-                            return;
-                        }
+                        //DoCast(me, SPELL_RAGEMERGE); //"phase spells" didnt worked correctly so Ive commented them and wrote solution witch doesnt need core support
+                        _isBanished = false;
+                    }
+                    else if (_isBanished)
+                    {
+                        _emergeTimer -= diff;
+                        //Do nothing while banished
+                        return;
                     }
 
                     //Return since we have no target
@@ -237,7 +233,7 @@ class boss_ragnaros : public CreatureScript
                                 break;
                             case EVENT_SUBMERGE:
                             {
-                                if (instance && !_isBanished)
+                                if (!_isBanished)
                                 {
                                     //Creature spawning and ragnaros becomming unattackable
                                     //is not very well supported in the core //no it really isnt
@@ -304,9 +300,9 @@ class boss_ragnaros : public CreatureScript
             bool _isBanished;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
-            return new boss_ragnarosAI(creature);
+            return GetInstanceAI<boss_ragnarosAI>(creature);
         }
 };
 
@@ -322,13 +318,12 @@ class npc_son_of_flame : public CreatureScript
                 instance = me->GetInstanceScript();
             }
 
-            void JustDied(Unit* /*killer*/) OVERRIDE
+            void JustDied(Unit* /*killer*/) override
             {
-                if (instance)
-                    instance->SetData(DATA_RAGNAROS_ADDS, 1);
+                instance->SetData(DATA_RAGNAROS_ADDS, 1);
             }
 
-            void UpdateAI(uint32 /*diff*/) OVERRIDE
+            void UpdateAI(uint32 /*diff*/) override
             {
                 if (!UpdateVictim())
                     return;
@@ -340,9 +335,9 @@ class npc_son_of_flame : public CreatureScript
             InstanceScript* instance;
         };
 
-        CreatureAI* GetAI(Creature* creature) const OVERRIDE
+        CreatureAI* GetAI(Creature* creature) const override
         {
-            return new npc_son_of_flameAI(creature);
+            return GetInstanceAI<npc_son_of_flameAI>(creature);
         }
 };
 

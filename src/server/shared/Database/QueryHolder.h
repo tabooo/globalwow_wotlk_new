@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -18,7 +18,7 @@
 #ifndef _QUERYHOLDER_H
 #define _QUERYHOLDER_H
 
-#include <ace/Future.h>
+#include <future>
 
 class SQLQueryHolder
 {
@@ -39,18 +39,21 @@ class SQLQueryHolder
         void SetPreparedResult(size_t index, PreparedResultSet* result);
 };
 
-typedef ACE_Future<SQLQueryHolder*> QueryResultHolderFuture;
+typedef std::future<SQLQueryHolder*> QueryResultHolderFuture;
+typedef std::promise<SQLQueryHolder*> QueryResultHolderPromise;
 
 class SQLQueryHolderTask : public SQLOperation
 {
     private:
-        SQLQueryHolder * m_holder;
-        QueryResultHolderFuture m_result;
+        SQLQueryHolder* m_holder;
+        QueryResultHolderPromise m_result;
 
     public:
-        SQLQueryHolderTask(SQLQueryHolder *holder, QueryResultHolderFuture res)
-            : m_holder(holder), m_result(res){ };
+        SQLQueryHolderTask(SQLQueryHolder* holder)
+            : m_holder(holder) { };
+
         bool Execute();
+        QueryResultHolderFuture GetFuture() { return m_result.get_future(); }
 
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,7 +19,6 @@
 #define TRINITY_PACKETLOG_H
 
 #include "Common.h"
-#include <ace/Singleton.h>
 
 enum Direction
 {
@@ -31,13 +30,17 @@ class WorldPacket;
 
 class PacketLog
 {
-    friend class ACE_Singleton<PacketLog, ACE_Thread_Mutex>;
-
     private:
         PacketLog();
         ~PacketLog();
 
     public:
+        static PacketLog* instance()
+        {
+            static PacketLog* instance = new PacketLog();
+            return instance;
+        }
+
         void Initialize();
         bool CanLogPacket() const { return (_file != NULL); }
         void LogPacket(WorldPacket const& packet, Direction direction);
@@ -46,5 +49,5 @@ class PacketLog
         FILE* _file;
 };
 
-#define sPacketLog ACE_Singleton<PacketLog, ACE_Thread_Mutex>::instance()
+#define sPacketLog PacketLog::instance()
 #endif

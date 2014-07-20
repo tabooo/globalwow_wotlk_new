@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -18,17 +18,15 @@
 
 #include "Errors.h"
 
-#include <ace/Stack_Trace.h>
-#include <ace/OS_NS_unistd.h>
 #include <cstdlib>
+#include <thread>
 
 namespace Trinity {
 
 void Assert(char const* file, int line, char const* function, char const* message)
 {
-    ACE_Stack_Trace st;
-    fprintf(stderr, "\n%s:%i in %s ASSERTION FAILED:\n  %s\n%s\n",
-            file, line, function, message, st.c_str());
+    fprintf(stderr, "\n%s:%i in %s ASSERTION FAILED:\n  %s\n",
+            file, line, function, message);
     *((volatile int*)NULL) = 0;
     exit(1);
 }
@@ -37,7 +35,8 @@ void Fatal(char const* file, int line, char const* function, char const* message
 {
     fprintf(stderr, "\n%s:%i in %s FATAL ERROR:\n  %s\n",
                    file, line, function, message);
-    ACE_OS::sleep(10);
+
+    std::this_thread::sleep_for(std::chrono::seconds(10));
     *((volatile int*)NULL) = 0;
     exit(1);
 }
