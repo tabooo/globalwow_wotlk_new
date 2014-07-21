@@ -398,8 +398,29 @@ enum Rates
     RATE_DURABILITY_LOSS_PARRY,
     RATE_DURABILITY_LOSS_ABSORB,
     RATE_DURABILITY_LOSS_BLOCK,
+    RATE_PVP_RANK_EXTRA_HONOR,
     RATE_MOVESPEED,
     MAX_RATES
+};
+
+enum HonorKillPvPRank
+{
+    HKRANK00,
+    HKRANK01,
+    HKRANK02,
+    HKRANK03,
+    HKRANK04,
+    HKRANK05,
+    HKRANK06,
+    HKRANK07,
+    HKRANK08,
+    HKRANK09,
+    HKRANK10,
+    HKRANK11,
+    HKRANK12,
+    HKRANK13,
+    HKRANK14,
+    HKRANKMAX
 };
 
 /// Can be used in SMSG_AUTH_RESPONSE packet
@@ -629,6 +650,8 @@ class World
         void SendZoneText(uint32 zone, const char *text, WorldSession* self = 0, uint32 team = 0);
         void SendServerMessage(ServerMessageType type, const char *text = "", Player* player = NULL);
 
+        uint32 pvp_ranks[HKRANKMAX];
+
         /// Are we in the middle of a shutdown?
         bool IsShuttingDown() const { return m_ShutdownTimer > 0; }
         uint32 GetShutDownTimeLeft() const { return m_ShutdownTimer; }
@@ -710,6 +733,14 @@ class World
         static int32 GetVisibilityNotifyPeriodOnContinents(){ return m_visibility_notify_periodOnContinents; }
         static int32 GetVisibilityNotifyPeriodInInstances() { return m_visibility_notify_periodInInstances;  }
         static int32 GetVisibilityNotifyPeriodInBGArenas()  { return m_visibility_notify_periodInBGArenas;   }
+        // movement anticheat
+        static bool GetEnableMvAnticheat()       { return m_EnableMvAnticheat;     }
+        static uint32 GetTeleportToPlaneAlarms() { return m_TeleportToPlaneAlarms; }
+        static uint32 GetMistimingDelta()        { return m_MistimingDelta;        }
+        static uint32 GetMistimingAlarms()       { return m_MistimingAlarms;       }
+        static uint32 GetTeleportToPlanePenalty() { return m_TeleportToPlanePenalty;}
+        static uint32 GetMovementPenalty()        { return m_MovementPenalty;       }
+        // end movement anticheat
 
         void ProcessCliCommands();
         void QueueCliCommand(CliCommandHolder* commandHolder) { cliCmdQueue.add(commandHolder); }
@@ -813,7 +844,13 @@ class World
         static int32 m_visibility_notify_periodOnContinents;
         static int32 m_visibility_notify_periodInInstances;
         static int32 m_visibility_notify_periodInBGArenas;
-
+        // movement anticheat enable flag
+        static bool m_EnableMvAnticheat;
+        static uint32 m_TeleportToPlaneAlarms;
+        static uint32 m_TeleportToPlanePenalty;
+        static uint32 m_MovementPenalty;
+        static uint32 m_MistimingDelta;
+        static uint32 m_MistimingAlarms;
         // CLI command holder to be thread safe
         LockedQueue<CliCommandHolder*> cliCmdQueue;
 
