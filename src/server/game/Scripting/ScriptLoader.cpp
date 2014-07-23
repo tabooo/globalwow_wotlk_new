@@ -696,6 +696,8 @@ void AddSC_outdoorpvp_zm();
 void AddSC_chat_log();
 void AddSC_action_ip_logger();
 
+void AddSC_PWS_Transmogrification();
+void AddSC_CS_Transmogrification();
 #endif
 
 void AddScripts()
@@ -1436,6 +1438,8 @@ void AddBattlegroundScripts()
 /* This is where custom scripts' loading functions should be declared. */
 	void AddSC_Duel_Reset();
 	void AddSC_Boss_Announcer();
+	void AddSC_PWS_Transmogrification();
+    void AddSC_CS_Transmogrification();
 #endif
 
 void AddCustomScripts()
@@ -1444,5 +1448,7 @@ void AddCustomScripts()
     /* This is where custom scripts should be added. */
 	AddSC_Duel_Reset();
 	AddSC_Boss_Announcer();
+	AddSC_PWS_Transmogrification();
+    AddSC_CS_Transmogrification();
 #endif
 }
