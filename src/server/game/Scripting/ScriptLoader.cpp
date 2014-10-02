@@ -18,13 +18,6 @@
 #include "ScriptLoader.h"
 #include "World.h"
 
-//examples
-void AddSC_example_creature();
-void AddSC_example_escort();
-void AddSC_example_gossip_codebox();
-void AddSC_example_misc();
-void AddSC_example_commandscript();
-
 // spells
 void AddSC_deathknight_spell_scripts();
 void AddSC_druid_spell_scripts();
@@ -39,7 +32,6 @@ void AddSC_warlock_spell_scripts();
 void AddSC_warrior_spell_scripts();
 void AddSC_quest_spell_scripts();
 void AddSC_item_spell_scripts();
-void AddSC_example_spell_scripts();
 void AddSC_holiday_spell_scripts();
 
 void AddSC_SmartScripts();
@@ -47,6 +39,7 @@ void AddSC_SmartScripts();
 //Commands
 void AddSC_account_commandscript();
 void AddSC_achievement_commandscript();
+void AddSC_ahbot_commandscript();
 void AddSC_arena_commandscript();
 void AddSC_ban_commandscript();
 void AddSC_bf_commandscript();
@@ -695,13 +688,10 @@ void AddSC_outdoorpvp_zm();
 void AddSC_chat_log();
 void AddSC_action_ip_logger();
 
-void AddSC_PWS_Transmogrification();
-void AddSC_CS_Transmogrification();
 #endif
 
 void AddScripts()
 {
-    AddExampleScripts();
     AddSpellScripts();
     AddSC_SmartScripts();
     AddCommandScripts();
@@ -719,15 +709,6 @@ void AddScripts()
 #endif
 }
 
-void AddExampleScripts()
-{
-    AddSC_example_creature();
-    AddSC_example_escort();
-    AddSC_example_gossip_codebox();
-    AddSC_example_misc();
-    AddSC_example_commandscript();
-}
-
 void AddSpellScripts()
 {
     AddSC_deathknight_spell_scripts();
@@ -743,7 +724,6 @@ void AddSpellScripts()
     AddSC_warrior_spell_scripts();
     AddSC_quest_spell_scripts();
     AddSC_item_spell_scripts();
-    AddSC_example_spell_scripts();
     AddSC_holiday_spell_scripts();
 }
 
@@ -751,6 +731,7 @@ void AddCommandScripts()
 {
     AddSC_account_commandscript();
     AddSC_achievement_commandscript();
+    AddSC_ahbot_commandscript();
     AddSC_arena_commandscript();
     AddSC_ban_commandscript();
     AddSC_bf_commandscript();
@@ -1434,19 +1415,13 @@ void AddBattlegroundScripts()
 
 #ifdef SCRIPTS
 /* This is where custom scripts' loading functions should be declared. */
-	void AddSC_Duel_Reset();
-	void AddSC_Boss_Announcer();
-	void AddSC_PWS_Transmogrification();
-    void AddSC_CS_Transmogrification();
+
 #endif
 
 void AddCustomScripts()
 {
 #ifdef SCRIPTS
     /* This is where custom scripts should be added. */
-	AddSC_Duel_Reset();
-	AddSC_Boss_Announcer();
-	AddSC_PWS_Transmogrification();
-    AddSC_CS_Transmogrification();
+
 #endif
 }

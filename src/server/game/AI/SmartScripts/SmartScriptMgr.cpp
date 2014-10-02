@@ -749,8 +749,24 @@ bool SmartAIMgr::IsEventValid(SmartScriptHolder& e)
             if (e.action.randomEmote.emote6 && !IsEmoteValid(e, e.action.randomEmote.emote6))
                 return false;
             break;
-        case SMART_ACTION_ADD_AURA:
         case SMART_ACTION_CAST:
+        {
+            if (!IsSpellValid(e, e.action.cast.spell))
+                return false;
+
+            SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(e.action.cast.spell);
+            for (uint32 j = 0; j < MAX_SPELL_EFFECTS; ++j)
+            {
+                if (spellInfo->Effects[j].IsEffect(SPELL_EFFECT_KILL_CREDIT) || spellInfo->Effects[j].IsEffect(SPELL_EFFECT_KILL_CREDIT2))
+                {
+                    if (spellInfo->Effects[j].TargetA.GetTarget() == TARGET_UNIT_CASTER)
+                        TC_LOG_ERROR("sql.sql", "SmartAIMgr: Entry %d SourceType %u Event %u Action %u Effect: SPELL_EFFECT_KILL_CREDIT: (SpellId: %u targetA: %u - targetB: %u) has invalid target for this Action",
+                        e.entryOrGuid, e.GetScriptType(), e.event_id, e.GetActionType(), e.action.cast.spell, spellInfo->Effects[j].TargetA, spellInfo->Effects[j].TargetB);
+                }
+            }
+            break;
+        }
+        case SMART_ACTION_ADD_AURA:
         case SMART_ACTION_INVOKER_CAST:
             if (!IsSpellValid(e, e.action.cast.spell))
                 return false;
@@ -883,10 +899,9 @@ bool SmartAIMgr::IsEventValid(SmartScriptHolder& e)
             CacheSpellContainerBounds sBounds = GetSummonGameObjectSpellContainerBounds(e.action.summonGO.entry);
             for (CacheSpellContainer::const_iterator itr = sBounds.first; itr != sBounds.second; ++itr)
                 TC_LOG_ERROR("sql.sql", "SmartAIMgr: Entry %d SourceType %u Event %u Action %u gameobject summon: There is a summon spell for gameobject entry %u (SpellId: %u, effect: %u)",
-                                e.entryOrGuid, e.GetScriptType(), e.event_id, e.GetActionType(), e.action.summonGO.entry, itr->second.first, itr->second.second);
+                    e.entryOrGuid, e.GetScriptType(), e.event_id, e.GetActionType(), e.action.summonGO.entry, itr->second.first, itr->second.second);
             break;
         }
-        case SMART_ACTION_ADD_ITEM:
         case SMART_ACTION_REMOVE_ITEM:
             if (!IsItemValid(e, e.action.item.entry))
                 return false;
@@ -894,6 +909,20 @@ bool SmartAIMgr::IsEventValid(SmartScriptHolder& e)
             if (!NotNULL(e, e.action.item.count))
                 return false;
             break;
+        case SMART_ACTION_ADD_ITEM:
+        {
+            if (!IsItemValid(e, e.action.item.entry))
+                return false;
+
+            if (!NotNULL(e, e.action.item.count))
+                return false;
+
+            CacheSpellContainerBounds sBounds = GetCreditItemSpellContainerBounds(e.action.item.entry);
+            for (CacheSpellContainer::const_iterator itr = sBounds.first; itr != sBounds.second; ++itr)
+                TC_LOG_ERROR("sql.sql", "SmartAIMgr: Entry %d SourceType %u Event %u Action %u Create Item: There is a create item spell for item %u (SpellId: %u effect: %u)",
+                e.entryOrGuid, e.GetScriptType(), e.event_id, e.GetActionType(), e.action.item.entry, itr->second.first, itr->second.second);
+            break;
+        }
         case SMART_ACTION_TELEPORT:
             if (!sMapStore.LookupEntry(e.action.teleport.mapID))
             {
@@ -1008,6 +1037,7 @@ bool SmartAIMgr::IsEventValid(SmartScriptHolder& e)
             }
             break;
         }
+        case SMART_ACTION_START_CLOSEST_WAYPOINT:
         case SMART_ACTION_FOLLOW:
         case SMART_ACTION_SET_ORIENTATION:
         case SMART_ACTION_STORE_TARGET_LIST:
@@ -1016,7 +1046,6 @@ bool SmartAIMgr::IsEventValid(SmartScriptHolder& e)
         case SMART_ACTION_DIE:
         case SMART_ACTION_SET_IN_COMBAT_WITH_ZONE:
         case SMART_ACTION_SET_ACTIVE:
-        case SMART_ACTION_STORE_VARIABLE_DECIMAL:
         case SMART_ACTION_WP_RESUME:
         case SMART_ACTION_KILL_UNIT:
         case SMART_ACTION_SET_INVINCIBILITY_HP_LEVEL:
@@ -1135,6 +1164,9 @@ void SmartAIMgr::LoadHelperStores()
 
             else if (spellInfo->Effects[j].IsEffect(SPELL_EFFECT_KILL_CREDIT) || spellInfo->Effects[j].IsEffect(SPELL_EFFECT_KILL_CREDIT2))
                 KillCreditSpellStore.insert(std::make_pair(uint32(spellInfo->Effects[j].MiscValue), std::make_pair(i, SpellEffIndex(j))));
+
+            else if (spellInfo->Effects[j].IsEffect(SPELL_EFFECT_CREATE_ITEM))
+                CreateItemSpellStore.insert(std::make_pair(uint32(spellInfo->Effects[j].ItemType), std::make_pair(i, SpellEffIndex(j))));
         }
     }
 
@@ -1146,6 +1178,7 @@ void SmartAIMgr::UnLoadHelperStores()
     SummonCreatureSpellStore.clear();
     SummonGameObjectSpellStore.clear();
     KillCreditSpellStore.clear();
+    CreateItemSpellStore.clear();
 }
 
 CacheSpellContainerBounds SmartAIMgr::GetSummonCreatureSpellContainerBounds(uint32 creatureEntry) const
@@ -1162,3 +1195,9 @@ CacheSpellContainerBounds SmartAIMgr::GetKillCreditSpellContainerBounds(uint32 k
 {
     return KillCreditSpellStore.equal_range(killCredit);
 }
+
+CacheSpellContainerBounds SmartAIMgr::GetCreditItemSpellContainerBounds(uint32 itemId) const
+{
+    return CreateItemSpellStore.equal_range(itemId);
+}
+
