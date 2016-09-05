@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -50,6 +50,7 @@ enum Spells
     SPELL_HEAT                  = 65667,
     SPELL_MOLTEN                = 62373,
     SPELL_BRITTLE               = 62382,
+    SPELL_BRITTLE_25            = 67114,
     SPELL_SHATTER               = 62383,
     SPELL_GROUND                = 62548,
 };
@@ -116,10 +117,9 @@ class boss_ignis : public CreatureScript
 
         struct boss_ignis_AI : public BossAI
         {
-            boss_ignis_AI(Creature* creature) : BossAI(creature, BOSS_IGNIS), _vehicle(me->GetVehicleKit())
+            boss_ignis_AI(Creature* creature) : BossAI(creature, BOSS_IGNIS)
             {
                 Initialize();
-                ASSERT(_vehicle);
             }
 
             void Initialize()
@@ -132,7 +132,7 @@ class boss_ignis : public CreatureScript
             void Reset() override
             {
                 _Reset();
-                if (_vehicle)
+                if (Vehicle* _vehicle = me->GetVehicleKit())
                     _vehicle->RemoveAllPassengers();
 
                 instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEVEMENT_IGNIS_START_EVENT);
@@ -178,7 +178,8 @@ class boss_ignis : public CreatureScript
                 {
                     summon->setFaction(16);
                     summon->SetReactState(REACT_AGGRESSIVE);
-                    summon->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_PACIFIED | UNIT_FLAG_STUNNED | UNIT_FLAG_DISABLE_MOVE);
+                    summon->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_PACIFIED | UNIT_FLAG_STUNNED | UNIT_FLAG_IMMUNE_TO_PC);
+                    summon->SetControlled(false, UNIT_STATE_ROOT);
                 }
 
                 summon->AI()->AttackStart(me->GetVictim());
@@ -219,7 +220,7 @@ class boss_ignis : public CreatureScript
                             events.ScheduleEvent(EVENT_JET, urand(35000, 40000));
                             break;
                         case EVENT_SLAG_POT:
-                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 100, true))
+                            if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1, 100, true))
                             {
                                 Talk(SAY_SLAG_POT);
                                 _slagPotGUID = target->GetGUID();
@@ -240,7 +241,7 @@ class boss_ignis : public CreatureScript
                         case EVENT_CHANGE_POT:
                             if (Unit* slagPotTarget = ObjectAccessor::GetUnit(*me, _slagPotGUID))
                             {
-                                slagPotTarget->AddAura(SPELL_SLAG_POT, slagPotTarget);
+                                DoCast(slagPotTarget, SPELL_SLAG_POT, true);
                                 slagPotTarget->EnterVehicle(me, 1);
                                 events.CancelEvent(EVENT_CHANGE_POT);
                                 events.ScheduleEvent(EVENT_END_POT, 10000);
@@ -274,16 +275,16 @@ class boss_ignis : public CreatureScript
                             Talk(SAY_BERSERK);
                             break;
                     }
+
+                    if (me->HasUnitState(UNIT_STATE_CASTING))
+                        return;
                 }
 
                 DoMeleeAttackIfReady();
-
-                EnterEvadeIfOutOfCombatArea(diff);
             }
 
         private:
             ObjectGuid _slagPotGUID;
-            Vehicle* _vehicle;
             time_t _firstConstructKill;
             bool _shattered;
 
@@ -320,7 +321,7 @@ class npc_iron_construct : public CreatureScript
 
             void DamageTaken(Unit* /*attacker*/, uint32& damage) override
             {
-                if (me->HasAura(SPELL_BRITTLE) && damage >= 5000)
+                if (me->HasAura(RAID_MODE(SPELL_BRITTLE, SPELL_BRITTLE_25)) && damage >= 5000)
                 {
                     DoCast(SPELL_SHATTER);
                     if (Creature* ignis = ObjectAccessor::GetCreature(*me, _instance->GetGuidData(BOSS_IGNIS)))
@@ -378,7 +379,8 @@ class npc_scorch_ground : public CreatureScript
             npc_scorch_groundAI(Creature* creature) : ScriptedAI(creature)
             {
                 Initialize();
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE |UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_PACIFIED);
+                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_PACIFIED);
+                me->SetControlled(true, UNIT_STATE_ROOT);
                 creature->SetDisplayId(16925); //model 2 in db cannot overwrite wdb fields
             }
 
@@ -457,14 +459,13 @@ class spell_ignis_slag_pot : public SpellScriptLoader
                 return true;
             }
 
-            void HandleEffectPeriodic(AuraEffect const* aurEff)
+            void HandleEffectPeriodic(AuraEffect const* /*aurEff*/)
             {
-                Unit* aurEffCaster = aurEff->GetCaster();
-                if (!aurEffCaster)
-                    return;
-
-                Unit* target = GetTarget();
-                aurEffCaster->CastSpell(target, SPELL_SLAG_POT_DAMAGE, true);
+                if (Unit* caster = GetCaster())
+                {
+                    Unit* target = GetTarget();
+                    caster->CastSpell(target, SPELL_SLAG_POT_DAMAGE, true);
+                }
             }
 
             void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -34,10 +34,10 @@
 #include "Pet.h"
 #include "ReputationMgr.h"
 #include "SkillDiscovery.h"
+#include "SpellHistory.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
 #include "Vehicle.h"
-#include "../Custom/Transmog/Transmogrification.h"
 
 class spell_gen_absorb0_hitlimit1 : public SpellScriptLoader
 {
@@ -430,6 +430,61 @@ class spell_gen_bandage : public SpellScriptLoader
         }
 };
 
+// Blood Reserve - 64568
+enum BloodReserve
+{
+    SPELL_GEN_BLOOD_RESERVE_AURA = 64568,
+    SPELL_GEN_BLOOD_RESERVE_HEAL = 64569
+};
+
+class spell_gen_blood_reserve : public SpellScriptLoader
+{
+    public:
+        spell_gen_blood_reserve() : SpellScriptLoader("spell_gen_blood_reserve") { }
+
+        class spell_gen_blood_reserve_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_gen_blood_reserve_AuraScript);
+
+            bool Validate(SpellInfo const* /*spellInfo*/) override
+            {
+                if (!sSpellMgr->GetSpellInfo(SPELL_GEN_BLOOD_RESERVE_HEAL))
+                    return false;
+                return true;
+            }
+
+            bool CheckProc(ProcEventInfo& eventInfo)
+            {
+                if (DamageInfo* dmgInfo = eventInfo.GetDamageInfo())
+                    if (Unit* caster = eventInfo.GetActionTarget())
+                        if (caster->HealthBelowPctDamaged(35, dmgInfo->GetDamage()))
+                            return true;
+
+                return false;
+            }
+
+            void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+            {
+                PreventDefaultAction();
+
+                Unit* caster = eventInfo.GetActionTarget();
+                caster->CastCustomSpell(SPELL_GEN_BLOOD_RESERVE_HEAL, SPELLVALUE_BASE_POINT0, aurEff->GetAmount(), caster, TRIGGERED_FULL_MASK, nullptr, aurEff);
+                caster->RemoveAura(SPELL_GEN_BLOOD_RESERVE_AURA);
+            }
+
+            void Register() override
+            {
+                DoCheckProc += AuraCheckProcFn(spell_gen_blood_reserve_AuraScript::CheckProc);
+                OnEffectProc += AuraEffectProcFn(spell_gen_blood_reserve_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+            }
+        };
+
+        AuraScript* GetAuraScript() const override
+        {
+            return new spell_gen_blood_reserve_AuraScript();
+        }
+};
+
 enum Bonked
 {
     SPELL_BONKED            = 62991,
@@ -611,6 +666,47 @@ class spell_gen_burn_brutallus : public SpellScriptLoader
         AuraScript* GetAuraScript() const override
         {
             return new spell_gen_burn_brutallus_AuraScript();
+        }
+};
+
+// 48750 - Burning Depths Necrolyte Image
+class spell_gen_burning_depths_necrolyte_image : public SpellScriptLoader
+{
+    public:
+        spell_gen_burning_depths_necrolyte_image() : SpellScriptLoader("spell_gen_burning_depths_necrolyte_image") { }
+
+        class spell_gen_burning_depths_necrolyte_image_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_gen_burning_depths_necrolyte_image_AuraScript);
+
+            bool Validate(SpellInfo const* spellInfo) override
+            {
+                if (!sSpellMgr->GetSpellInfo(uint32(spellInfo->Effects[EFFECT_2].CalcValue())))
+                    return false;
+                return true;
+            }
+
+            void HandleApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+            {
+                if (Unit* caster = GetCaster())
+                    caster->CastSpell(GetTarget(), uint32(GetSpellInfo()->Effects[EFFECT_2].CalcValue()));
+            }
+
+            void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+            {
+                GetTarget()->RemoveAurasDueToSpell(uint32(GetSpellInfo()->Effects[EFFECT_2].CalcValue()), GetCasterGUID());
+            }
+
+            void Register() override
+            {
+                AfterEffectApply += AuraEffectApplyFn(spell_gen_burning_depths_necrolyte_image_AuraScript::HandleApply, EFFECT_0, SPELL_AURA_TRANSFORM, AURA_EFFECT_HANDLE_REAL);
+                AfterEffectRemove += AuraEffectRemoveFn(spell_gen_burning_depths_necrolyte_image_AuraScript::HandleRemove, EFFECT_0, SPELL_AURA_TRANSFORM, AURA_EFFECT_HANDLE_REAL);
+            }
+        };
+
+        AuraScript* GetAuraScript() const override
+        {
+            return new spell_gen_burning_depths_necrolyte_image_AuraScript();
         }
 };
 
@@ -820,12 +916,7 @@ class spell_gen_clone_weapon_aura : public SpellScriptLoader
                         if (Player* player = caster->ToPlayer())
                         {
                             if (Item* mainItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND))
-                            {
-                                if (uint32 entry = sTransmogrification->GetFakeEntry(mainItem))
-                                    target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID, entry);
-                                else
-                                    target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID, mainItem->GetEntry());
-                            }
+                                target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID, mainItem->GetEntry());
                         }
                         else
                             target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID, caster->GetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID));
@@ -839,12 +930,7 @@ class spell_gen_clone_weapon_aura : public SpellScriptLoader
                         if (Player* player = caster->ToPlayer())
                         {
                             if (Item* offItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND))
-                            {
-                                if (uint32 entry = sTransmogrification->GetFakeEntry(offItem))
-                                    target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 1, entry);
-                                else
-                                    target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 1, offItem->GetEntry());
-                            }
+                                target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 1, offItem->GetEntry());
                         }
                         else
                             target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 1, caster->GetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 1));
@@ -857,12 +943,7 @@ class spell_gen_clone_weapon_aura : public SpellScriptLoader
                         if (Player* player = caster->ToPlayer())
                         {
                             if (Item* rangedItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_RANGED))
-                            {
-                                if (uint32 entry = sTransmogrification->GetFakeEntry(rangedItem))
-                                    target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 2, entry);
-                                else
-                                    target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 2, rangedItem->GetEntry());
-                            }
+                                target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 2, rangedItem->GetEntry());
                         }
                         else
                             target->SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 2, caster->GetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + 2));
@@ -1219,7 +1300,7 @@ class spell_gen_defend : public SpellScriptLoader
 
             void Register() override
             {
-                SpellInfo const* spell = sSpellMgr->EnsureSpellInfo(m_scriptSpellId);
+                SpellInfo const* spell = sSpellMgr->AssertSpellInfo(m_scriptSpellId);
 
                 // Defend spells cast by NPCs (add visuals)
                 if (spell->Effects[EFFECT_0].ApplyAuraName == SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN)
@@ -1309,8 +1390,8 @@ class spell_gen_divine_storm_cd_reset : public SpellScriptLoader
             void HandleScript(SpellEffIndex /*effIndex*/)
             {
                 Player* caster = GetCaster()->ToPlayer();
-                if (caster->HasSpellCooldown(SPELL_DIVINE_STORM))
-                    caster->RemoveSpellCooldown(SPELL_DIVINE_STORM, true);
+                if (caster->GetSpellHistory()->HasCooldown(SPELL_DIVINE_STORM))
+                    caster->GetSpellHistory()->ResetCooldown(SPELL_DIVINE_STORM, true);
             }
 
             void Register() override
@@ -1904,10 +1985,7 @@ class spell_gen_mount : public SpellScriptLoader
                     if (map == 530 || (map == 571 && target->HasSpell(SPELL_COLD_WEATHER_FLYING)))
                         canFly = true;
 
-                    float x, y, z;
-                    target->GetPosition(x, y, z);
-                    uint32 areaFlag = target->GetBaseMap()->GetAreaFlag(x, y, z);
-                    AreaTableEntry const* area = sAreaStore.LookupEntry(areaFlag);
+                    AreaTableEntry const* area = sAreaTableStore.LookupEntry(target->GetAreaId());
                     if (!area || (canFly && (area->flags & AREA_FLAG_NO_FLY_ZONE)))
                         canFly = false;
 
@@ -2062,7 +2140,7 @@ class spell_gen_mounted_charge: public SpellScriptLoader
                         }
 
                         // If target isn't a training dummy there's a chance of failing the charge
-                        if (!target->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE) && roll_chance_f(12.5f))
+                        if (!target->IsCharmedOwnedByPlayerOrPlayer() && roll_chance_f(12.5f))
                             spellId = SPELL_CHARGE_MISS_EFFECT;
 
                         if (Unit* vehicle = GetCaster()->GetVehicleBase())
@@ -2125,7 +2203,7 @@ class spell_gen_mounted_charge: public SpellScriptLoader
 
             void Register() override
             {
-                SpellInfo const* spell = sSpellMgr->EnsureSpellInfo(m_scriptSpellId);
+                SpellInfo const* spell = sSpellMgr->AssertSpellInfo(m_scriptSpellId);
 
                 if (spell->HasEffect(SPELL_EFFECT_SCRIPT_EFFECT))
                     OnEffectHitTarget += SpellEffectFn(spell_gen_mounted_charge_SpellScript::HandleScriptEffect, EFFECT_FIRST_FOUND, SPELL_EFFECT_SCRIPT_EFFECT);
@@ -3346,7 +3424,7 @@ class spell_pvp_trinket_wotf_shared_cd : public SpellScriptLoader
             {
                 // This is only needed because spells cast from spell_linked_spell are triggered by default
                 // Spell::SendSpellCooldown() skips all spells with TRIGGERED_IGNORE_SPELL_AND_CATEGORY_CD
-                GetCaster()->ToPlayer()->AddSpellAndCategoryCooldowns(GetSpellInfo(), GetCastItem() ? GetCastItem()->GetEntry() : 0, GetSpell());
+                GetCaster()->GetSpellHistory()->StartCooldown(GetSpellInfo(), 0, GetSpell());
             }
 
             void Register() override
@@ -3398,7 +3476,7 @@ class spell_gen_turkey_marker : public SpellScriptLoader
 
             void Register() override
             {
-                AfterEffectApply += AuraEffectApplyFn(spell_gen_turkey_marker_AuraScript::OnApply, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY, AURA_EFFECT_HANDLE_REAL);
+                AfterEffectApply += AuraEffectApplyFn(spell_gen_turkey_marker_AuraScript::OnApply, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
                 OnEffectPeriodic += AuraEffectPeriodicFn(spell_gen_turkey_marker_AuraScript::OnPeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
             }
 
@@ -3645,6 +3723,43 @@ class spell_gen_eject_all_passengers : public SpellScriptLoader
         }
 };
 
+class spell_gen_eject_passenger : public SpellScriptLoader
+{
+    public:
+        spell_gen_eject_passenger() : SpellScriptLoader("spell_gen_eject_passenger") { }
+
+        class spell_gen_eject_passenger_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_gen_eject_passenger_SpellScript);
+
+            bool Validate(SpellInfo const* spellInfo) override
+            {
+                if (spellInfo->Effects[EFFECT_0].CalcValue() < 1)
+                    return false;
+                return true;
+            }
+
+            void EjectPassenger(SpellEffIndex /*effIndex*/)
+            {
+                if (Vehicle* vehicle = GetHitUnit()->GetVehicleKit())
+                {
+                    if (Unit* passenger = vehicle->GetPassenger(GetEffectValue() - 1))
+                        passenger->ExitVehicle();
+                }
+            }
+
+            void Register() override
+            {
+                OnEffectHitTarget += SpellEffectFn(spell_gen_eject_passenger_SpellScript::EjectPassenger, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+            }
+        };
+
+        SpellScript* GetSpellScript() const override
+        {
+            return new spell_gen_eject_passenger_SpellScript();
+        }
+};
+
 enum GMFreeze
 {
     SPELL_GM_FREEZE = 9454
@@ -3749,6 +3864,432 @@ public:
     }
 };
 
+enum RequiredMixologySpells
+{
+    SPELL_MIXOLOGY                      = 53042,
+    // Flasks
+    SPELL_FLASK_OF_THE_FROST_WYRM       = 53755,
+    SPELL_FLASK_OF_STONEBLOOD           = 53758,
+    SPELL_FLASK_OF_ENDLESS_RAGE         = 53760,
+    SPELL_FLASK_OF_PURE_MOJO            = 54212,
+    SPELL_LESSER_FLASK_OF_RESISTANCE    = 62380,
+    SPELL_LESSER_FLASK_OF_TOUGHNESS     = 53752,
+    SPELL_FLASK_OF_BLINDING_LIGHT       = 28521,
+    SPELL_FLASK_OF_CHROMATIC_WONDER     = 42735,
+    SPELL_FLASK_OF_FORTIFICATION        = 28518,
+    SPELL_FLASK_OF_MIGHTY_RESTORATION   = 28519,
+    SPELL_FLASK_OF_PURE_DEATH           = 28540,
+    SPELL_FLASK_OF_RELENTLESS_ASSAULT   = 28520,
+    SPELL_FLASK_OF_CHROMATIC_RESISTANCE = 17629,
+    SPELL_FLASK_OF_DISTILLED_WISDOM     = 17627,
+    SPELL_FLASK_OF_SUPREME_POWER        = 17628,
+    SPELL_FLASK_OF_THE_TITANS           = 17626,
+    // Elixirs
+    SPELL_ELIXIR_OF_MIGHTY_AGILITY      = 28497,
+    SPELL_ELIXIR_OF_ACCURACY            = 60340,
+    SPELL_ELIXIR_OF_DEADLY_STRIKES      = 60341,
+    SPELL_ELIXIR_OF_MIGHTY_DEFENSE      = 60343,
+    SPELL_ELIXIR_OF_EXPERTISE           = 60344,
+    SPELL_ELIXIR_OF_ARMOR_PIERCING      = 60345,
+    SPELL_ELIXIR_OF_LIGHTNING_SPEED     = 60346,
+    SPELL_ELIXIR_OF_MIGHTY_FORTITUDE    = 53751,
+    SPELL_ELIXIR_OF_MIGHTY_MAGEBLOOD    = 53764,
+    SPELL_ELIXIR_OF_MIGHTY_STRENGTH     = 53748,
+    SPELL_ELIXIR_OF_MIGHTY_TOUGHTS      = 60347,
+    SPELL_ELIXIR_OF_PROTECTION          = 53763,
+    SPELL_ELIXIR_OF_SPIRIT              = 53747,
+    SPELL_GURUS_ELIXIR                  = 53749,
+    SPELL_SHADOWPOWER_ELIXIR            = 33721,
+    SPELL_WRATH_ELIXIR                  = 53746,
+    SPELL_ELIXIR_OF_EMPOWERMENT         = 28514,
+    SPELL_ELIXIR_OF_MAJOR_MAGEBLOOD     = 28509,
+    SPELL_ELIXIR_OF_MAJOR_SHADOW_POWER  = 28503,
+    SPELL_ELIXIR_OF_MAJOR_DEFENSE       = 28502,
+    SPELL_FEL_STRENGTH_ELIXIR           = 38954,
+    SPELL_ELIXIR_OF_IRONSKIN            = 39628,
+    SPELL_ELIXIR_OF_MAJOR_AGILITY       = 54494,
+    SPELL_ELIXIR_OF_DRAENIC_WISDOM      = 39627,
+    SPELL_ELIXIR_OF_MAJOR_FIREPOWER     = 28501,
+    SPELL_ELIXIR_OF_MAJOR_FROST_POWER   = 28493,
+    SPELL_EARTHEN_ELIXIR                = 39626,
+    SPELL_ELIXIR_OF_MASTERY             = 33726,
+    SPELL_ELIXIR_OF_HEALING_POWER       = 28491,
+    SPELL_ELIXIR_OF_MAJOR_FORTITUDE     = 39625,
+    SPELL_ELIXIR_OF_MAJOR_STRENGTH      = 28490,
+    SPELL_ADEPTS_ELIXIR                 = 54452,
+    SPELL_ONSLAUGHT_ELIXIR              = 33720,
+    SPELL_MIGHTY_TROLLS_BLOOD_ELIXIR    = 24361,
+    SPELL_GREATER_ARCANE_ELIXIR         = 17539,
+    SPELL_ELIXIR_OF_THE_MONGOOSE        = 17538,
+    SPELL_ELIXIR_OF_BRUTE_FORCE         = 17537,
+    SPELL_ELIXIR_OF_SAGES               = 17535,
+    SPELL_ELIXIR_OF_SUPERIOR_DEFENSE    = 11348,
+    SPELL_ELIXIR_OF_DEMONSLAYING        = 11406,
+    SPELL_ELIXIR_OF_GREATER_FIREPOWER   = 26276,
+    SPELL_ELIXIR_OF_SHADOW_POWER        = 11474,
+    SPELL_MAGEBLOOD_ELIXIR              = 24363,
+    SPELL_ELIXIR_OF_GIANTS              = 11405,
+    SPELL_ELIXIR_OF_GREATER_AGILITY     = 11334,
+    SPELL_ARCANE_ELIXIR                 = 11390,
+    SPELL_ELIXIR_OF_GREATER_INTELLECT   = 11396,
+    SPELL_ELIXIR_OF_GREATER_DEFENSE     = 11349,
+    SPELL_ELIXIR_OF_FROST_POWER         = 21920,
+    SPELL_ELIXIR_OF_AGILITY             = 11328,
+    SPELL_MAJOR_TROLLS_BLLOOD_ELIXIR    =  3223,
+    SPELL_ELIXIR_OF_FORTITUDE           =  3593,
+    SPELL_ELIXIR_OF_OGRES_STRENGTH      =  3164,
+    SPELL_ELIXIR_OF_FIREPOWER           =  7844,
+    SPELL_ELIXIR_OF_LESSER_AGILITY      =  3160,
+    SPELL_ELIXIR_OF_DEFENSE             =  3220,
+    SPELL_STRONG_TROLLS_BLOOD_ELIXIR    =  3222,
+    SPELL_ELIXIR_OF_MINOR_ACCURACY      = 63729,
+    SPELL_ELIXIR_OF_WISDOM              =  3166,
+    SPELL_ELIXIR_OF_GIANTH_GROWTH       =  8212,
+    SPELL_ELIXIR_OF_MINOR_AGILITY       =  2374,
+    SPELL_ELIXIR_OF_MINOR_FORTITUDE     =  2378,
+    SPELL_WEAK_TROLLS_BLOOD_ELIXIR      =  3219,
+    SPELL_ELIXIR_OF_LIONS_STRENGTH      =  2367,
+    SPELL_ELIXIR_OF_MINOR_DEFENSE       =   673
+};
+
+class spell_gen_mixology_bonus : public SpellScriptLoader
+{
+public:
+    spell_gen_mixology_bonus() : SpellScriptLoader("spell_gen_mixology_bonus") { }
+
+    class spell_gen_mixology_bonus_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_gen_mixology_bonus_AuraScript);
+
+    public:
+        spell_gen_mixology_bonus_AuraScript()
+        {
+            bonus = 0;
+        }
+
+    private:
+        bool Validate(SpellInfo const* /*spellInfo*/) override
+        {
+            if (!sSpellMgr->GetSpellInfo(SPELL_MIXOLOGY))
+                return false;
+            return true;
+        }
+
+        bool Load() override
+        {
+            return GetCaster() && GetCaster()->GetTypeId() == TYPEID_PLAYER;
+        }
+
+        void SetBonusValueForEffect(SpellEffIndex effIndex, int32 value, AuraEffect const* aurEff)
+        {
+            if (aurEff->GetEffIndex() == uint32(effIndex))
+                bonus = value;
+        }
+
+        void CalculateAmount(AuraEffect const* aurEff, int32& amount, bool& /*canBeRecalculated*/)
+        {
+            if (GetCaster()->HasAura(SPELL_MIXOLOGY) && GetCaster()->HasSpell(GetSpellInfo()->Effects[EFFECT_0].TriggerSpell))
+            {
+                switch (GetId())
+                {
+                    case SPELL_WEAK_TROLLS_BLOOD_ELIXIR:
+                    case SPELL_MAGEBLOOD_ELIXIR:
+                        bonus = amount;
+                        break;
+                    case SPELL_ELIXIR_OF_FROST_POWER:
+                    case SPELL_LESSER_FLASK_OF_TOUGHNESS:
+                    case SPELL_LESSER_FLASK_OF_RESISTANCE:
+                        bonus = CalculatePct(amount, 80);
+                        break;
+                    case SPELL_ELIXIR_OF_MINOR_DEFENSE:
+                    case SPELL_ELIXIR_OF_LIONS_STRENGTH:
+                    case SPELL_ELIXIR_OF_MINOR_AGILITY:
+                    case SPELL_MAJOR_TROLLS_BLLOOD_ELIXIR:
+                    case SPELL_ELIXIR_OF_SHADOW_POWER:
+                    case SPELL_ELIXIR_OF_BRUTE_FORCE:
+                    case SPELL_MIGHTY_TROLLS_BLOOD_ELIXIR:
+                    case SPELL_ELIXIR_OF_GREATER_FIREPOWER:
+                    case SPELL_ONSLAUGHT_ELIXIR:
+                    case SPELL_EARTHEN_ELIXIR:
+                    case SPELL_ELIXIR_OF_MAJOR_AGILITY:
+                    case SPELL_FLASK_OF_THE_TITANS:
+                    case SPELL_FLASK_OF_RELENTLESS_ASSAULT:
+                    case SPELL_FLASK_OF_STONEBLOOD:
+                    case SPELL_ELIXIR_OF_MINOR_ACCURACY:
+                        bonus = CalculatePct(amount, 50);
+                        break;
+                    case SPELL_ELIXIR_OF_PROTECTION:
+                        bonus = 280;
+                        break;
+                    case SPELL_ELIXIR_OF_MAJOR_DEFENSE:
+                        bonus = 200;
+                        break;
+                    case SPELL_ELIXIR_OF_GREATER_DEFENSE:
+                    case SPELL_ELIXIR_OF_SUPERIOR_DEFENSE:
+                        bonus = 140;
+                        break;
+                    case SPELL_ELIXIR_OF_FORTITUDE:
+                        bonus = 100;
+                        break;
+                    case SPELL_FLASK_OF_ENDLESS_RAGE:
+                        bonus = 82;
+                        break;
+                    case SPELL_ELIXIR_OF_DEFENSE:
+                        bonus = 70;
+                        break;
+                    case SPELL_ELIXIR_OF_DEMONSLAYING:
+                        bonus = 50;
+                        break;
+                    case SPELL_FLASK_OF_THE_FROST_WYRM:
+                        bonus = 47;
+                        break;
+                    case SPELL_WRATH_ELIXIR:
+                        bonus = 32;
+                        break;
+                    case SPELL_ELIXIR_OF_MAJOR_FROST_POWER:
+                    case SPELL_ELIXIR_OF_MAJOR_FIREPOWER:
+                    case SPELL_ELIXIR_OF_MAJOR_SHADOW_POWER:
+                        bonus = 29;
+                        break;
+                    case SPELL_ELIXIR_OF_MIGHTY_TOUGHTS:
+                        bonus = 27;
+                        break;
+                    case SPELL_FLASK_OF_SUPREME_POWER:
+                    case SPELL_FLASK_OF_BLINDING_LIGHT:
+                    case SPELL_FLASK_OF_PURE_DEATH:
+                    case SPELL_SHADOWPOWER_ELIXIR:
+                        bonus = 23;
+                        break;
+                    case SPELL_ELIXIR_OF_MIGHTY_AGILITY:
+                    case SPELL_FLASK_OF_DISTILLED_WISDOM:
+                    case SPELL_ELIXIR_OF_SPIRIT:
+                    case SPELL_ELIXIR_OF_MIGHTY_STRENGTH:
+                    case SPELL_FLASK_OF_PURE_MOJO:
+                    case SPELL_ELIXIR_OF_ACCURACY:
+                    case SPELL_ELIXIR_OF_DEADLY_STRIKES:
+                    case SPELL_ELIXIR_OF_MIGHTY_DEFENSE:
+                    case SPELL_ELIXIR_OF_EXPERTISE:
+                    case SPELL_ELIXIR_OF_ARMOR_PIERCING:
+                    case SPELL_ELIXIR_OF_LIGHTNING_SPEED:
+                        bonus = 20;
+                        break;
+                    case SPELL_FLASK_OF_CHROMATIC_RESISTANCE:
+                        bonus = 17;
+                        break;
+                    case SPELL_ELIXIR_OF_MINOR_FORTITUDE:
+                    case SPELL_ELIXIR_OF_MAJOR_STRENGTH:
+                        bonus = 15;
+                        break;
+                    case SPELL_FLASK_OF_MIGHTY_RESTORATION:
+                        bonus = 13;
+                        break;
+                    case SPELL_ARCANE_ELIXIR:
+                        bonus = 12;
+                        break;
+                    case SPELL_ELIXIR_OF_GREATER_AGILITY:
+                    case SPELL_ELIXIR_OF_GIANTS:
+                        bonus = 11;
+                        break;
+                    case SPELL_ELIXIR_OF_AGILITY:
+                    case SPELL_ELIXIR_OF_GREATER_INTELLECT:
+                    case SPELL_ELIXIR_OF_SAGES:
+                    case SPELL_ELIXIR_OF_IRONSKIN:
+                    case SPELL_ELIXIR_OF_MIGHTY_MAGEBLOOD:
+                        bonus = 10;
+                        break;
+                    case SPELL_ELIXIR_OF_HEALING_POWER:
+                        bonus = 9;
+                        break;
+                    case SPELL_ELIXIR_OF_DRAENIC_WISDOM:
+                    case SPELL_GURUS_ELIXIR:
+                        bonus = 8;
+                        break;
+                    case SPELL_ELIXIR_OF_FIREPOWER:
+                    case SPELL_ELIXIR_OF_MAJOR_MAGEBLOOD:
+                    case SPELL_ELIXIR_OF_MASTERY:
+                        bonus = 6;
+                        break;
+                    case SPELL_ELIXIR_OF_LESSER_AGILITY:
+                    case SPELL_ELIXIR_OF_OGRES_STRENGTH:
+                    case SPELL_ELIXIR_OF_WISDOM:
+                    case SPELL_ELIXIR_OF_THE_MONGOOSE:
+                        bonus = 5;
+                        break;
+                    case SPELL_STRONG_TROLLS_BLOOD_ELIXIR:
+                    case SPELL_FLASK_OF_CHROMATIC_WONDER:
+                        bonus = 4;
+                        break;
+                    case SPELL_ELIXIR_OF_EMPOWERMENT:
+                        bonus = -10;
+                        break;
+                    case SPELL_ADEPTS_ELIXIR:
+                        SetBonusValueForEffect(EFFECT_0, 13, aurEff);
+                        SetBonusValueForEffect(EFFECT_1, 13, aurEff);
+                        SetBonusValueForEffect(EFFECT_2, 8, aurEff);
+                        break;
+                    case SPELL_ELIXIR_OF_MIGHTY_FORTITUDE:
+                        SetBonusValueForEffect(EFFECT_0, 160, aurEff);
+                        break;
+                    case SPELL_ELIXIR_OF_MAJOR_FORTITUDE:
+                        SetBonusValueForEffect(EFFECT_0, 116, aurEff);
+                        SetBonusValueForEffect(EFFECT_1, 6, aurEff);
+                        break;
+                    case SPELL_FEL_STRENGTH_ELIXIR:
+                        SetBonusValueForEffect(EFFECT_0, 40, aurEff);
+                        SetBonusValueForEffect(EFFECT_1, 40, aurEff);
+                        break;
+                    case SPELL_FLASK_OF_FORTIFICATION:
+                        SetBonusValueForEffect(EFFECT_0, 210, aurEff);
+                        SetBonusValueForEffect(EFFECT_1, 5, aurEff);
+                        break;
+                    case SPELL_GREATER_ARCANE_ELIXIR:
+                        SetBonusValueForEffect(EFFECT_0, 19, aurEff);
+                        SetBonusValueForEffect(EFFECT_1, 19, aurEff);
+                        SetBonusValueForEffect(EFFECT_2, 5, aurEff);
+                        break;
+                    case SPELL_ELIXIR_OF_GIANTH_GROWTH:
+                        SetBonusValueForEffect(EFFECT_0, 5, aurEff);
+                        break;
+                    default:
+                        TC_LOG_ERROR("spells", "SpellId %u couldn't be processed in spell_gen_mixology_bonus", GetId());
+                        break;
+                }
+                amount += bonus;
+            }
+        }
+
+        int32 bonus;
+
+        void Register() override
+        {
+            DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_gen_mixology_bonus_AuraScript::CalculateAmount, EFFECT_ALL, SPELL_AURA_ANY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_gen_mixology_bonus_AuraScript();
+    }
+};
+
+enum LandmineKnockbackAchievement
+{
+    SPELL_LANDMINE_KNOCKBACK_ACHIEVEMENT = 57064
+};
+
+class spell_gen_landmine_knockback_achievement : public SpellScriptLoader
+{
+public:
+    spell_gen_landmine_knockback_achievement() : SpellScriptLoader("spell_gen_landmine_knockback_achievement") { }
+
+    class spell_gen_landmine_knockback_achievement_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_gen_landmine_knockback_achievement_SpellScript);
+
+        void HandleScript(SpellEffIndex /*effIndex*/)
+        {
+            if (Player* target = GetHitPlayer())
+            {
+                Aura const* aura = GetHitAura();
+                if (!aura || aura->GetStackAmount() < 10)
+                    return;
+
+                target->CastSpell(target, SPELL_LANDMINE_KNOCKBACK_ACHIEVEMENT, true);
+            }
+        }
+
+        void Register() override
+        {
+            OnEffectHitTarget += SpellEffectFn(spell_gen_landmine_knockback_achievement_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_gen_landmine_knockback_achievement_SpellScript();
+    }
+};
+
+// 34098 - ClearAllDebuffs
+class spell_gen_clear_debuffs : public SpellScriptLoader
+{
+    public:
+        spell_gen_clear_debuffs() : SpellScriptLoader("spell_gen_clear_debuffs") { }
+
+        class spell_gen_clear_debuffs_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_gen_clear_debuffs_SpellScript);
+
+            void HandleScript(SpellEffIndex /*effIndex*/)
+            {
+                if (Unit* target = GetHitUnit())
+                {
+                    target->RemoveOwnedAuras([](Aura const* aura)
+                    {
+                        SpellInfo const* spellInfo = aura->GetSpellInfo();
+                        return !spellInfo->IsPositive() && !spellInfo->IsPassive();
+                    });
+                }
+            }
+
+            void Register() override
+            {
+                OnEffectHitTarget += SpellEffectFn(spell_gen_clear_debuffs_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+            }
+        };
+
+        SpellScript* GetSpellScript() const override
+        {
+            return new spell_gen_clear_debuffs_SpellScript();
+        }
+};
+
+enum PonySpells
+{
+    ACHIEV_PONY_UP              = 3736,
+    MOUNT_PONY                  = 29736
+};
+
+class spell_gen_pony_mount_check : public SpellScriptLoader
+{
+    public:
+        spell_gen_pony_mount_check() : SpellScriptLoader("spell_gen_pony_mount_check") { }
+
+        class spell_gen_pony_mount_check_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_gen_pony_mount_check_AuraScript);
+
+            void HandleEffectPeriodic(AuraEffect const* /*aurEff*/)
+            {
+                Unit* caster = GetCaster();
+                Player* owner = caster->GetOwner()->ToPlayer();
+                if (!caster || !owner || !owner->HasAchieved(ACHIEV_PONY_UP))
+                    return;
+
+                if (owner->IsMounted())
+                {
+                    caster->Mount(MOUNT_PONY);
+                    caster->SetSpeedRate(MOVE_RUN, owner->GetSpeedRate(MOVE_RUN));
+                }
+                else if (caster->IsMounted())
+                {
+                    caster->Dismount();
+                    caster->SetSpeedRate(MOVE_RUN, owner->GetSpeedRate(MOVE_RUN));
+                }
+            }
+
+            void Register() override
+            {
+                OnEffectPeriodic += AuraEffectPeriodicFn(spell_gen_pony_mount_check_AuraScript::HandleEffectPeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
+            }
+        };
+
+        AuraScript* GetAuraScript() const
+        {
+            return new spell_gen_pony_mount_check_AuraScript();
+        }
+};
+
 void AddSC_generic_spell_scripts()
 {
     new spell_gen_absorb0_hitlimit1();
@@ -3759,10 +4300,12 @@ void AddSC_generic_spell_scripts()
     new spell_gen_aura_service_uniform();
     new spell_gen_av_drekthar_presence();
     new spell_gen_bandage();
+    new spell_gen_blood_reserve();
     new spell_gen_bonked();
     new spell_gen_break_shield("spell_gen_break_shield");
     new spell_gen_break_shield("spell_gen_tournament_counterattack");
     new spell_gen_burn_brutallus();
+    new spell_gen_burning_depths_necrolyte_image();
     new spell_gen_cannibalize();
     new spell_gen_chaos_blast();
     new spell_gen_clone();
@@ -3829,6 +4372,11 @@ void AddSC_generic_spell_scripts()
     new spell_gen_wg_water();
     new spell_gen_whisper_gulch_yogg_saron_whisper();
     new spell_gen_eject_all_passengers();
+    new spell_gen_eject_passenger();
     new spell_gen_gm_freeze();
     new spell_gen_stand();
+    new spell_gen_mixology_bonus();
+    new spell_gen_landmine_knockback_achievement();
+    new spell_gen_clear_debuffs();
+    new spell_gen_pony_mount_check();
 }

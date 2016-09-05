@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,6 +25,7 @@
 #include "ScriptMgr.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
+#include "SpellHistory.h"
 #include "Group.h"
 
 enum PaladinSpells
@@ -36,11 +37,18 @@ enum PaladinSpells
     SPELL_PALADIN_HOLY_SHOCK_R1                  = 20473,
     SPELL_PALADIN_HOLY_SHOCK_R1_DAMAGE           = 25912,
     SPELL_PALADIN_HOLY_SHOCK_R1_HEALING          = 25914,
+    SPELL_PALADIN_ILLUMINATION_ENERGIZE          = 20272,
 
     SPELL_PALADIN_BLESSING_OF_LOWER_CITY_DRUID   = 37878,
     SPELL_PALADIN_BLESSING_OF_LOWER_CITY_PALADIN = 37879,
     SPELL_PALADIN_BLESSING_OF_LOWER_CITY_PRIEST  = 37880,
     SPELL_PALADIN_BLESSING_OF_LOWER_CITY_SHAMAN  = 37881,
+
+    SPELL_PALADIN_BEACON_OF_LIGHT                = 53563,
+    SPELL_PALADIN_BEACON_OF_LIGHT_HEAL_1         = 53652,
+    SPELL_PALADIN_BEACON_OF_LIGHT_HEAL_2         = 53653,
+    SPELL_PALADIN_BEACON_OF_LIGHT_HEAL_3         = 53654,
+    SPELL_PALADIN_HOLY_LIGHT                     = 635,
 
     SPELL_PALADIN_DIVINE_STORM                   = 53385,
     SPELL_PALADIN_DIVINE_STORM_DUMMY             = 54171,
@@ -133,7 +141,7 @@ class spell_pal_ardent_defender : public SpellScriptLoader
                 int32 remainingHealth = victim->GetHealth() - dmgInfo.GetDamage();
                 uint32 allowedHealth = victim->CountPctFromMaxHealth(35);
                 // If damage kills us
-                if (remainingHealth <= 0 && !victim->ToPlayer()->HasSpellCooldown(PAL_SPELL_ARDENT_DEFENDER_HEAL))
+                if (remainingHealth <= 0 && !victim->GetSpellHistory()->HasCooldown(PAL_SPELL_ARDENT_DEFENDER_HEAL))
                 {
                     // Cast healing spell, completely avoid damage
                     absorbAmount = dmgInfo.GetDamage();
@@ -148,7 +156,7 @@ class spell_pal_ardent_defender : public SpellScriptLoader
 
                     int32 healAmount = int32(victim->CountPctFromMaxHealth(uint32(healPct * pctFromDefense)));
                     victim->CastCustomSpell(victim, PAL_SPELL_ARDENT_DEFENDER_HEAL, &healAmount, NULL, NULL, true, NULL, aurEff);
-                    victim->ToPlayer()->AddSpellCooldown(PAL_SPELL_ARDENT_DEFENDER_HEAL, 0, time(NULL) + 120);
+                    victim->GetSpellHistory()->AddCooldown(PAL_SPELL_ARDENT_DEFENDER_HEAL, 0, std::chrono::minutes(2));
                 }
                 else if (remainingHealth < int32(allowedHealth))
                 {
@@ -864,6 +872,61 @@ class spell_pal_holy_shock : public SpellScriptLoader
         }
 };
 
+// -20210 - Illumination
+class spell_pal_illumination : public SpellScriptLoader
+{
+public:
+    spell_pal_illumination() : SpellScriptLoader("spell_pal_illumination") { }
+
+    class spell_pal_illumination_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_pal_illumination_AuraScript);
+
+        bool Validate(SpellInfo const* /*spellInfo*/) override
+        {
+            if (!sSpellMgr->GetSpellInfo(SPELL_PALADIN_HOLY_SHOCK_R1_HEALING) ||
+                !sSpellMgr->GetSpellInfo(SPELL_PALADIN_ILLUMINATION_ENERGIZE) ||
+                !sSpellMgr->GetSpellInfo(SPELL_PALADIN_HOLY_SHOCK_R1))
+                return false;
+            return true;
+        }
+
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+        {
+            PreventDefaultAction();
+
+            // this script is valid only for the Holy Shock procs of illumination
+            if (eventInfo.GetHealInfo() && eventInfo.GetHealInfo()->GetSpellInfo())
+            {
+                SpellInfo const* originalSpell = nullptr;
+
+                // if proc comes from the Holy Shock heal, need to get mana cost of original spell - else it's the original heal itself
+                if (eventInfo.GetHealInfo()->GetSpellInfo()->SpellFamilyFlags[1] & 0x00010000)
+                    originalSpell = sSpellMgr->GetSpellInfo(sSpellMgr->GetSpellWithRank(SPELL_PALADIN_HOLY_SHOCK_R1, eventInfo.GetHealInfo()->GetSpellInfo()->GetRank()));
+                else
+                    originalSpell = eventInfo.GetHealInfo()->GetSpellInfo();
+
+                if (originalSpell && aurEff->GetSpellInfo())
+                {
+                    Unit* target = eventInfo.GetActor(); // Paladin is the target of the energize
+                    uint32 bp = CalculatePct(originalSpell->CalcPowerCost(target, originalSpell->GetSchoolMask()), aurEff->GetSpellInfo()->Effects[EFFECT_1].CalcValue());
+                    target->CastCustomSpell(SPELL_PALADIN_ILLUMINATION_ENERGIZE, SPELLVALUE_BASE_POINT0, bp, target, true, nullptr, aurEff);
+                }
+            }
+        }
+
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_pal_illumination_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_pal_illumination_AuraScript();
+    }
+};
+
 // Maybe this is incorrect
 // These spells should always be cast on login, regardless of whether the player has the talent or not
 
@@ -1152,6 +1215,68 @@ class spell_pal_lay_on_hands : public SpellScriptLoader
         }
 };
 
+// 53651 - Light's Beacon - Beacon of Light
+class spell_pal_light_s_beacon : public SpellScriptLoader
+{
+    public:
+        spell_pal_light_s_beacon() : SpellScriptLoader("spell_pal_light_s_beacon") { }
+
+        class spell_pal_light_s_beacon_AuraScript : public AuraScript
+        {
+            PrepareAuraScript(spell_pal_light_s_beacon_AuraScript);
+
+            bool Validate(SpellInfo const* /*spellInfo*/) override
+            {
+                if (!sSpellMgr->GetSpellInfo(SPELL_PALADIN_BEACON_OF_LIGHT)
+                    || !sSpellMgr->GetSpellInfo(SPELL_PALADIN_BEACON_OF_LIGHT_HEAL_1)
+                    || !sSpellMgr->GetSpellInfo(SPELL_PALADIN_BEACON_OF_LIGHT_HEAL_2)
+                    || !sSpellMgr->GetSpellInfo(SPELL_PALADIN_BEACON_OF_LIGHT_HEAL_3)
+                    || !sSpellMgr->GetSpellInfo(SPELL_PALADIN_HOLY_LIGHT))
+                    return false;
+                return true;
+            }
+
+            bool CheckProc(ProcEventInfo& eventInfo)
+            {
+                if (GetTarget()->HasAura(SPELL_PALADIN_BEACON_OF_LIGHT, eventInfo.GetActor()->GetGUID()))
+                    return false;
+                return true;
+            }
+
+            void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+            {
+                PreventDefaultAction();
+
+                SpellInfo const* procSpell = eventInfo.GetSpellInfo();
+                if (!procSpell)
+                    return;
+
+                uint32 healSpellId = procSpell->IsRankOf(sSpellMgr->AssertSpellInfo(SPELL_PALADIN_HOLY_LIGHT)) ? SPELL_PALADIN_BEACON_OF_LIGHT_HEAL_1 : SPELL_PALADIN_BEACON_OF_LIGHT_HEAL_3;
+                uint32 heal = CalculatePct(eventInfo.GetHealInfo()->GetHeal(), aurEff->GetAmount());
+
+                Unit* beaconTarget = GetCaster();
+                if (!beaconTarget || !beaconTarget->HasAura(SPELL_PALADIN_BEACON_OF_LIGHT, eventInfo.GetActor()->GetGUID()))
+                    return;
+
+                /// @todo: caster must be the healed unit to perform distance checks correctly
+                ///        but that will break animation on clientside
+                ///        caster in spell packets must be the healing unit
+                eventInfo.GetActor()->CastCustomSpell(healSpellId, SPELLVALUE_BASE_POINT0, heal, beaconTarget, true);
+            }
+
+            void Register() override
+            {
+                DoCheckProc += AuraCheckProcFn(spell_pal_light_s_beacon_AuraScript::CheckProc);
+                OnEffectProc += AuraEffectProcFn(spell_pal_light_s_beacon_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+            }
+        };
+
+        AuraScript* GetAuraScript() const override
+        {
+            return new spell_pal_light_s_beacon_AuraScript();
+        }
+};
+
 // 31789 - Righteous Defense
 class spell_pal_righteous_defense : public SpellScriptLoader
 {
@@ -1324,6 +1449,7 @@ void AddSC_paladin_spell_scripts()
     new spell_pal_hand_of_sacrifice();
     new spell_pal_hand_of_salvation();
     new spell_pal_holy_shock();
+    new spell_pal_illumination();
     new spell_pal_improved_aura("spell_pal_improved_concentraction_aura", SPELL_PALADIN_IMPROVED_CONCENTRACTION_AURA);
     new spell_pal_improved_aura("spell_pal_improved_devotion_aura", SPELL_PALADIN_IMPROVED_DEVOTION_AURA);
     new spell_pal_improved_aura("spell_pal_sanctified_retribution", SPELL_PALADIN_SANCTIFIED_RETRIBUTION_AURA);
@@ -1337,6 +1463,7 @@ void AddSC_paladin_spell_scripts()
     new spell_pal_judgement("spell_pal_judgement_of_wisdom", SPELL_PALADIN_JUDGEMENT_OF_WISDOM);
     new spell_pal_judgement_of_command();
     new spell_pal_lay_on_hands();
+    new spell_pal_light_s_beacon();
     new spell_pal_righteous_defense();
     new spell_pal_sacred_shield();
     new spell_pal_seal_of_righteousness();

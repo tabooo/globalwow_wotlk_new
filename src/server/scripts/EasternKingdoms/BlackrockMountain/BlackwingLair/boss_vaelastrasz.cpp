@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -68,7 +68,7 @@ public:
 
     struct boss_vaelAI : public BossAI
     {
-        boss_vaelAI(Creature* creature) : BossAI(creature, BOSS_VAELASTRAZ)
+        boss_vaelAI(Creature* creature) : BossAI(creature, DATA_VAELASTRAZ_THE_CORRUPT)
         {
             Initialize();
             creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
@@ -209,6 +209,9 @@ public:
                         events.ScheduleEvent(EVENT_BURNINGADRENALINE_TANK, 45000);
                         break;
                 }
+
+                if (me->HasUnitState(UNIT_STATE_CASTING))
+                    return;
             }
 
             // Yell if hp lower than 15%
@@ -221,11 +224,11 @@ public:
             DoMeleeAttackIfReady();
         }
 
-        void sGossipSelect(Player* player, uint32 sender, uint32 action) override
+        void sGossipSelect(Player* player, uint32 menuId, uint32 gossipListId) override
         {
-            if (sender == GOSSIP_ID && action == 0)
+            if (menuId == GOSSIP_ID && gossipListId == 0)
             {
-                player->CLOSE_GOSSIP_MENU();
+                CloseGossipMenuFor(player);
                 BeginSpeech(player);
             }
         }

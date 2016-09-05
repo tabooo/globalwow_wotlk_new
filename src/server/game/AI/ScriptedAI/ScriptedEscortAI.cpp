@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -66,13 +66,13 @@ void npc_escortAI::AttackStart(Unit* who)
 }
 
 //see followerAI
-bool npc_escortAI::AssistPlayerInCombat(Unit* who)
+bool npc_escortAI::AssistPlayerInCombatAgainst(Unit* who)
 {
     if (!who || !who->GetVictim())
         return false;
 
     //experimental (unknown) flag not present
-    if (!(me->GetCreatureTemplate()->type_flags & CREATURE_TYPEFLAGS_AID_PLAYERS))
+    if (!(me->GetCreatureTemplate()->type_flags & CREATURE_TYPE_FLAG_CAN_ASSIST))
         return false;
 
     //not a player
@@ -105,9 +105,9 @@ bool npc_escortAI::AssistPlayerInCombat(Unit* who)
 
 void npc_escortAI::MoveInLineOfSight(Unit* who)
 {
-    if (!me->HasUnitState(UNIT_STATE_STUNNED) && who->isTargetableForAttack() && who->isInAccessiblePlaceFor(me))
+    if (me->HasReactState(REACT_AGGRESSIVE) && !me->HasUnitState(UNIT_STATE_STUNNED) && who->isTargetableForAttack() && who->isInAccessiblePlaceFor(me))
     {
-        if (HasEscortState(STATE_ESCORT_ESCORTING) && AssistPlayerInCombat(who))
+        if (HasEscortState(STATE_ESCORT_ESCORTING) && AssistPlayerInCombatAgainst(who))
             return;
 
         if (!me->CanFly() && me->GetDistanceZ(who) > CREATURE_Z_ATTACK_RANGE)
@@ -120,7 +120,13 @@ void npc_escortAI::MoveInLineOfSight(Unit* who)
             {
                 if (!me->GetVictim())
                 {
-                    who->RemoveAurasByType(SPELL_AURA_MOD_STEALTH);
+                    // Clear distracted state on combat
+                    if (me->HasUnitState(UNIT_STATE_DISTRACTED))
+                    {
+                        me->ClearUnitState(UNIT_STATE_DISTRACTED);
+                        me->GetMotionMaster()->Clear();
+                    }
+
                     AttackStart(who);
                 }
                 else if (me->GetMap()->IsDungeon())
@@ -178,7 +184,7 @@ void npc_escortAI::ReturnToLastPoint()
     me->GetMotionMaster()->MovePoint(POINT_LAST_POINT, x, y, z);
 }
 
-void npc_escortAI::EnterEvadeMode()
+void npc_escortAI::EnterEvadeMode(EvadeReason /*why*/)
 {
     me->RemoveAllAuras();
     me->DeleteThreatList();
@@ -433,13 +439,13 @@ void npc_escortAI::Start(bool isActiveAttacker /* = true*/, bool run /* = false 
 {
     if (me->GetVictim())
     {
-        TC_LOG_ERROR("misc", "TSCR ERROR: EscortAI (script: %s, creature entry: %u) attempts to Start while in combat", me->GetScriptName().c_str(), me->GetEntry());
+        TC_LOG_ERROR("scripts.escortai", "TSCR ERROR: EscortAI (script: %s, creature entry: %u) attempts to Start while in combat", me->GetScriptName().c_str(), me->GetEntry());
         return;
     }
 
     if (HasEscortState(STATE_ESCORT_ESCORTING))
     {
-        TC_LOG_ERROR("scripts", "EscortAI (script: %s, creature entry: %u) attempts to Start while already escorting", me->GetScriptName().c_str(), me->GetEntry());
+        TC_LOG_ERROR("scripts.escortai", "EscortAI (script: %s, creature entry: %u) attempts to Start while already escorting", me->GetScriptName().c_str(), me->GetEntry());
         return;
     }
 

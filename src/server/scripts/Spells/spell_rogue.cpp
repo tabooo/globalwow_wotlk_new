@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,6 +25,7 @@
 #include "ScriptMgr.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
+#include "SpellHistory.h"
 #include "Containers.h"
 
 enum RogueSpells
@@ -40,6 +41,10 @@ enum RogueSpells
     SPELL_ROGUE_SHIV_TRIGGERED                  = 5940,
     SPELL_ROGUE_TRICKS_OF_THE_TRADE_DMG_BOOST   = 57933,
     SPELL_ROGUE_TRICKS_OF_THE_TRADE_PROC        = 59628,
+    SPELL_ROGUE_HONOR_AMONG_THIEVES             = 51698,
+    SPELL_ROGUE_HONOR_AMONG_THIEVES_PROC        = 52916,
+    SPELL_ROGUE_HONOR_AMONG_THIEVES_2           = 51699,
+    SPELL_ROGUE_T10_2P_BONUS                    = 70804
 };
 
 // 13877, 33735, (check 51211, 65956) - Blade Flurry
@@ -139,11 +144,11 @@ class spell_rog_cheat_death : public SpellScriptLoader
             void Absorb(AuraEffect* /*aurEff*/, DamageInfo & dmgInfo, uint32 & absorbAmount)
             {
                 Player* target = GetTarget()->ToPlayer();
-                if (dmgInfo.GetDamage() < target->GetHealth() || target->HasSpellCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN) ||  !roll_chance_i(absorbChance))
+                if (dmgInfo.GetDamage() < target->GetHealth() || target->GetSpellHistory()->HasCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN) || !roll_chance_i(absorbChance))
                     return;
 
                 target->CastSpell(target, SPELL_ROGUE_CHEAT_DEATH_COOLDOWN, true);
-                target->AddSpellCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN, 0, time(NULL) + 60);
+                target->GetSpellHistory()->AddCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN, 0, std::chrono::minutes(1));
 
                 uint32 health10 = target->CountPctFromMaxHealth(10);
 
@@ -232,7 +237,7 @@ class spell_rog_deadly_poison : public SpellScriptLoader
                             SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(enchant->spellid[s]);
                             if (!spellInfo)
                             {
-                                TC_LOG_ERROR("spells", "Player::CastItemCombatSpell Enchant %i, player (Name: %s, GUID: %u) cast unknown spell %i", enchant->ID, player->GetName().c_str(), player->GetGUIDLow(), enchant->spellid[s]);
+                                TC_LOG_ERROR("spells", "Player::CastItemCombatSpell Enchant %i, player (Name: %s, GUID: %u) cast unknown spell %i", enchant->ID, player->GetName().c_str(), player->GetGUID().GetCounter(), enchant->spellid[s]);
                                 continue;
                             }
 
@@ -443,35 +448,21 @@ class spell_rog_preparation : public SpellScriptLoader
 
             void HandleDummy(SpellEffIndex /*effIndex*/)
             {
-                Player* caster = GetCaster()->ToPlayer();
-
-                //immediately finishes the cooldown on certain Rogue abilities
-                const SpellCooldowns& cm = caster->GetSpellCooldownMap();
-                for (SpellCooldowns::const_iterator itr = cm.begin(); itr != cm.end();)
+                Unit* caster = GetCaster();
+                caster->GetSpellHistory()->ResetCooldowns([caster](SpellHistory::CooldownStorageType::iterator itr) -> bool
                 {
-                    SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(itr->first);
+                    SpellInfo const* spellInfo = sSpellMgr->AssertSpellInfo(itr->first);
+                    if (spellInfo->SpellFamilyName != SPELLFAMILY_ROGUE)
+                        return false;
 
-                    if (spellInfo->SpellFamilyName == SPELLFAMILY_ROGUE)
-                    {
-                        if (spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_COLDB_SHADOWSTEP ||      // Cold Blood, Shadowstep
-                            spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_VAN_EVAS_SPRINT)           // Vanish, Evasion, Sprint
-                            caster->RemoveSpellCooldown((itr++)->first, true);
-                        else if (caster->HasAura(SPELL_ROGUE_GLYPH_OF_PREPARATION))
-                        {
-                            if (spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_DISMANTLE ||         // Dismantle
-                                spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_KICK ||               // Kick
-                                (spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_BLADE_FLURRY &&     // Blade Flurry
-                                spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_BLADE_FLURRY))
-                                caster->RemoveSpellCooldown((itr++)->first, true);
-                            else
-                                ++itr;
-                        }
-                        else
-                            ++itr;
-                    }
-                    else
-                        ++itr;
-                }
+                    return (spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_COLDB_SHADOWSTEP ||  // Cold Blood, Shadowstep
+                        spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_VAN_EVAS_SPRINT) ||       // Vanish, Evasion, Sprint
+                        (caster->HasAura(SPELL_ROGUE_GLYPH_OF_PREPARATION) &&
+                        (spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_DISMANTLE ||            // Dismantle
+                        spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_KICK ||                   // Kick
+                        (spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_BLADE_FLURRY &&          // Blade Flurry
+                        spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_BLADE_FLURRY)));
+                }, true);
             }
 
             void Register() override
@@ -532,10 +523,11 @@ class spell_rog_prey_on_the_weak : public SpellScriptLoader
 };
 
 // -1943 - Rupture
+#define RuptureScriptName "spell_rog_rupture"
 class spell_rog_rupture : public SpellScriptLoader
 {
     public:
-        spell_rog_rupture() : SpellScriptLoader("spell_rog_rupture") { }
+        spell_rog_rupture() : SpellScriptLoader(RuptureScriptName) { }
 
         class spell_rog_rupture_AuraScript : public AuraScript
         {
@@ -544,6 +536,7 @@ class spell_rog_rupture : public SpellScriptLoader
             bool Load() override
             {
                 Unit* caster = GetCaster();
+                BonusDuration = 0;
                 return caster && caster->GetTypeId() == TYPEID_PLAYER;
             }
 
@@ -571,15 +564,81 @@ class spell_rog_rupture : public SpellScriptLoader
                 }
             }
 
+            void ResetDuration(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+            {
+                BonusDuration = 0;
+            }
+
             void Register() override
             {
                 DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_rog_rupture_AuraScript::CalculateAmount, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE);
+                AfterEffectApply += AuraEffectApplyFn(spell_rog_rupture_AuraScript::ResetDuration, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE, AURA_EFFECT_HANDLE_REAPPLY);
             }
+
+        public:
+            // For Glyph of Backstab use
+            uint32 BonusDuration;
         };
 
         AuraScript* GetAuraScript() const override
         {
             return new spell_rog_rupture_AuraScript();
+        }
+};
+
+// 63975 - Glyph of Backstab (triggered - serverside)
+class spell_rog_glyph_of_backstab_triggered : public SpellScriptLoader
+{
+    public:
+        spell_rog_glyph_of_backstab_triggered() : SpellScriptLoader("spell_rog_glyph_of_backstab_triggered") { }
+
+        class spell_rog_glyph_of_backstab_triggered_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_rog_glyph_of_backstab_triggered_SpellScript);
+
+            typedef spell_rog_rupture::spell_rog_rupture_AuraScript RuptureAuraScript;
+
+            void HandleScript(SpellEffIndex effIndex)
+            {
+                PreventHitDefaultEffect(effIndex);
+
+                Unit* caster = GetCaster();
+                // search our Rupture aura on target
+                if (AuraEffect* aurEff = GetHitUnit()->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_ROGUE, 0x00100000, 0, 0, caster->GetGUID()))
+                {
+                    RuptureAuraScript* ruptureAuraScript = dynamic_cast<RuptureAuraScript*>(aurEff->GetBase()->GetScriptByName(RuptureScriptName));
+                    if (!ruptureAuraScript)
+                        return;
+
+                    uint32& bonusDuration = ruptureAuraScript->BonusDuration;
+
+                    // already includes duration mod from Glyph of Rupture
+                    uint32 countMin = aurEff->GetBase()->GetMaxDuration();
+                    uint32 countMax = countMin - bonusDuration;
+
+                    // this glyph
+                    countMax += 6000;
+
+                    if (countMin < countMax)
+                    {
+                        bonusDuration += 2000;
+
+                        aurEff->GetBase()->SetDuration(aurEff->GetBase()->GetDuration() + 2000);
+                        aurEff->GetBase()->SetMaxDuration(countMin + 2000);
+                    }
+
+                }
+            }
+
+            void Register() override
+            {
+                OnEffectHitTarget += SpellEffectFn(spell_rog_glyph_of_backstab_triggered_SpellScript::HandleScript, EFFECT_0, SPELL_EFFECT_SCRIPT_EFFECT);
+            }
+        };
+
+        SpellScript* GetSpellScript() const override
+        {
+            return new spell_rog_glyph_of_backstab_triggered_SpellScript();
         }
 };
 
@@ -716,6 +775,177 @@ class spell_rog_tricks_of_the_trade_proc : public SpellScriptLoader
         }
 };
 
+// 51698,51700,51701 - Honor Among Thieves
+class spell_rog_honor_among_thieves : public SpellScriptLoader
+{
+public:
+    spell_rog_honor_among_thieves() : SpellScriptLoader("spell_rog_honor_among_thieves") { }
+
+    class spell_rog_honor_among_thieves_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_rog_honor_among_thieves_AuraScript);
+
+        bool CheckProc(ProcEventInfo& /*eventInfo*/)
+        {
+            Unit* caster = GetCaster();
+            if (!caster)
+                return false;
+
+            if (!caster->GetSpellHistory()->HasCooldown(GetSpellInfo()->Effects[EFFECT_0].TriggerSpell))
+                return true;
+
+            return false;
+        }
+
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+        {
+            PreventDefaultAction();
+
+            Unit* caster = GetCaster();
+            if (!caster)
+                return;
+
+            Unit* target = GetTarget();
+            target->CastSpell(target, GetSpellInfo()->Effects[EFFECT_0].TriggerSpell, TriggerCastFlags(TRIGGERED_FULL_MASK & ~TRIGGERED_IGNORE_SPELL_AND_CATEGORY_CD), nullptr, aurEff, caster->GetGUID());
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_rog_honor_among_thieves_AuraScript::CheckProc);
+            OnEffectProc += AuraEffectProcFn(spell_rog_honor_among_thieves_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_rog_honor_among_thieves_AuraScript();
+    }
+};
+
+// 52916 - Honor Among Thieves (Proc)
+class spell_rog_honor_among_thieves_proc : public SpellScriptLoader
+{
+public:
+    spell_rog_honor_among_thieves_proc() : SpellScriptLoader("spell_rog_honor_among_thieves_proc") { }
+
+    class spell_rog_honor_among_thieves_proc_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_rog_honor_among_thieves_proc_SpellScript);
+
+        bool Validate(SpellInfo const* /*spellInfo*/) override
+        {
+            if (!sSpellMgr->GetSpellInfo(SPELL_ROGUE_HONOR_AMONG_THIEVES_PROC))
+                return false;
+
+            return true;
+        }
+
+        void FilterTargets(std::list<WorldObject*>& targets)
+        {
+            targets.clear();
+
+            Unit* target = GetOriginalCaster();
+            if (!target)
+                return;
+
+            targets.push_back(target);
+        }
+
+        void HandleBeforeHit()
+        {
+            Unit* target = GetHitUnit();
+            if (!target)
+                return;
+
+            /*
+             * The applied aura has a duration of 8 seconds
+             * This prevents new applications while its active
+             * Removing it on each new proc enables the application from different sources (different grouped players)
+             * and on new procs after the source cooldown is finished (1 second)
+             */
+            if (target->HasAura(GetSpellInfo()->Id))
+                target->RemoveAura(GetSpellInfo()->Id);
+        }
+
+        void TriggerCooldown()
+        {
+            Unit* target = GetHitUnit();
+            if (!target)
+                return;
+
+            target->GetSpellHistory()->AddCooldown(GetSpellInfo()->Id, 0, std::chrono::seconds(1));
+        }
+
+        void Register() override
+        {
+            OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_rog_honor_among_thieves_proc_SpellScript::FilterTargets, EFFECT_0, TARGET_UNIT_CASTER_AREA_PARTY);
+            BeforeHit += SpellHitFn(spell_rog_honor_among_thieves_proc_SpellScript::HandleBeforeHit);
+            AfterHit += SpellHitFn(spell_rog_honor_among_thieves_proc_SpellScript::TriggerCooldown);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_rog_honor_among_thieves_proc_SpellScript();
+    }
+
+    class spell_rog_honor_among_thieves_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_rog_honor_among_thieves_proc_AuraScript);
+
+        void HandleEffectApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+        {
+            if (Player* player = GetTarget()->ToPlayer())
+                if (Unit* spellTarget = ObjectAccessor::GetUnit(*player, player->GetTarget()))
+                    player->CastSpell(spellTarget, SPELL_ROGUE_HONOR_AMONG_THIEVES_2, true);
+        }
+
+        void Register() override
+        {
+            AfterEffectApply += AuraEffectApplyFn(spell_rog_honor_among_thieves_proc_AuraScript::HandleEffectApply, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_rog_honor_among_thieves_proc_AuraScript();
+    }
+};
+
+// 70805 - Rogue T10 2P Bonus -- THIS SHOULD BE REMOVED WITH NEW PROC SYSTEM.
+class spell_rog_t10_2p_bonus : public SpellScriptLoader
+{
+public:
+    spell_rog_t10_2p_bonus() : SpellScriptLoader("spell_rog_t10_2p_bonus") { }
+
+    class spell_rog_t10_2p_bonus_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_rog_t10_2p_bonus_AuraScript);
+
+        bool Validate(SpellInfo const* /*spellInfo*/) override
+        {
+            if (!sSpellMgr->GetSpellInfo(SPELL_ROGUE_T10_2P_BONUS))
+                return false;
+            return true;
+        }
+
+        bool CheckProc(ProcEventInfo& eventInfo)
+        {
+            return eventInfo.GetActor() == eventInfo.GetActionTarget();
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_rog_t10_2p_bonus_AuraScript::CheckProc);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_rog_t10_2p_bonus_AuraScript();
+    }
+};
+
 void AddSC_rogue_spell_scripts()
 {
     new spell_rog_blade_flurry();
@@ -726,7 +956,11 @@ void AddSC_rogue_spell_scripts()
     new spell_rog_preparation();
     new spell_rog_prey_on_the_weak();
     new spell_rog_rupture();
+    new spell_rog_glyph_of_backstab_triggered();
     new spell_rog_shiv();
     new spell_rog_tricks_of_the_trade();
     new spell_rog_tricks_of_the_trade_proc();
+    new spell_rog_honor_among_thieves();
+    new spell_rog_honor_among_thieves_proc();
+    new spell_rog_t10_2p_bonus();
 }

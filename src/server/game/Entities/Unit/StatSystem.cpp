@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -23,7 +23,6 @@
 #include "SharedDefines.h"
 #include "SpellAuras.h"
 #include "SpellAuraEffects.h"
-#include "SpellMgr.h"
 #include "World.h"
 
 inline bool _ModifyUInt32(bool apply, uint32& baseValue, int32& amount)
@@ -500,7 +499,7 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
         if (getClass() == CLASS_SHAMAN || getClass() == CLASS_PALADIN)                      // mental quickness
             UpdateSpellDamageAndHealingBonus();
 
-        if (pet && pet->IsPetGhoul()) // At melee attack power change for DK pet
+        if (pet && (pet->IsPetGhoul() || pet->IsRisenAlly())) // At melee attack power change for DK pet
             pet->UpdateAttackPowerAndDamage();
 
         if (guardian && guardian->IsSpiritWolf()) // At melee attack power change for Shaman feral spirit
@@ -1114,7 +1113,7 @@ bool Guardian::UpdateStats(Stats stat)
     Unit* owner = GetOwner();
     // Handle Death Knight Glyphs and Talents
     float mod = 0.75f;
-    if (IsPetGhoul() && (stat == STAT_STAMINA || stat == STAT_STRENGTH))
+    if ((IsPetGhoul() || IsRisenAlly()) && (stat == STAT_STAMINA || stat == STAT_STRENGTH))
     {
         if (stat == STAT_STAMINA)
             mod = 0.3f; // Default Owner's Stamina scale
@@ -1153,7 +1152,7 @@ bool Guardian::UpdateStats(Stats stat)
 
                 if (itr != ToPet()->m_spells.end())                                 // If pet has Wild Hunt
                 {
-                    SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(itr->first); // Then get the SpellProto and add the dummy effect value
+                    SpellInfo const* spellInfo = sSpellMgr->AssertSpellInfo(itr->first); // Then get the SpellProto and add the dummy effect value
                     AddPct(mod, spellInfo->Effects[EFFECT_0].CalcValue());
                 }
             }
@@ -1322,15 +1321,20 @@ void Guardian::UpdateAttackPowerAndDamage(bool ranged)
 
                 if (itr != ToPet()->m_spells.end())                                 // If pet has Wild Hunt
                 {
-                    SpellInfo const* sProto = sSpellMgr->EnsureSpellInfo(itr->first); // Then get the SpellProto and add the dummy effect value
+                    SpellInfo const* sProto = sSpellMgr->AssertSpellInfo(itr->first); // Then get the SpellProto and add the dummy effect value
                     mod += CalculatePct(1.0f, sProto->Effects[1].CalcValue());
                 }
             }
 
             bonusAP = owner->GetTotalAttackPowerValue(RANGED_ATTACK) * 0.22f * mod;
+            if (AuraEffect* aurEff = owner->GetAuraEffectOfRankedSpell(34453, EFFECT_1, owner->GetGUID())) // Animal Handler
+            {
+                AddPct(bonusAP, aurEff->GetAmount());
+                AddPct(val, aurEff->GetAmount());
+            }
             SetBonusDamage(int32(owner->GetTotalAttackPowerValue(RANGED_ATTACK) * 0.1287f * mod));
         }
-        else if (IsPetGhoul()) //ghouls benefit from deathknight's attack power (may be summon pet or not)
+        else if (IsPetGhoul() || IsRisenAlly()) //ghouls benefit from deathknight's attack power (may be summon pet or not)
         {
             bonusAP = owner->GetTotalAttackPowerValue(BASE_ATTACK) * 0.22f;
             SetBonusDamage(int32(owner->GetTotalAttackPowerValue(BASE_ATTACK) * 0.1287f));
@@ -1422,7 +1426,7 @@ void Guardian::UpdateDamagePhysical(WeaponAttackType attType)
     float maxdamage = ((base_value + weapon_maxdamage) * base_pct + total_value) * total_pct;
 
     //  Pet's base damage changes depending on happiness
-    if (IsHunterPet() && attType == BASE_ATTACK)
+    if (IsHunterPet())
     {
         switch (ToPet()->GetHappinessState())
         {

@@ -13,12 +13,8 @@
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
   Custom/pvp_titles.cpp
-  Custom/announce_boss.cpp
-  Custom/duel_reset_script.cpp
 #  ${sources_Custom}
-    Custom/Transmog/Transmogrification.h
-    Custom/Transmog/Transmogrification.cpp
-    Custom/Transmog/Transmogrifier.cpp
+
 )
 
 message("  -> Prepared: Custom")

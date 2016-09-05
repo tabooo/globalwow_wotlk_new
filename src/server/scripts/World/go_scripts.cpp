@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -24,7 +24,6 @@ go_ethereum_stasis
 go_sacred_fire_of_life
 go_shrine_of_the_birds
 go_southfury_moonstone
-go_field_repair_bot_74A
 go_orb_of_command
 go_resonite_cask
 go_tablet_of_madness
@@ -41,9 +40,8 @@ go_dragonflayer_cage
 go_tadpole_cage
 go_amberpine_outhouse
 go_hive_pod
-go_gjalerbron_cage
-go_large_gjalerbron_cage
 go_veil_skith_cage
+go_toy_train_set
 EndContentData */
 
 #include "ScriptMgr.h"
@@ -88,24 +86,6 @@ public:
     {
         if (player->HasSkill(SKILL_TAILORING) && player->GetBaseSkillValue(SKILL_TAILORING) >= 280 && !player->HasSpell(26086))
             player->CastSpell(player, 26095, false);
-
-        return true;
-    }
-};
-
-/*######
-## go_field_repair_bot_74A
-######*/
-
-class go_field_repair_bot_74A : public GameObjectScript
-{
-public:
-    go_field_repair_bot_74A() : GameObjectScript("go_field_repair_bot_74A") { }
-
-    bool OnGossipHello(Player* player, GameObject* /*go*/) override
-    {
-        if (player->HasSkill(SKILL_ENGINEERING) && player->GetBaseSkillValue(SKILL_ENGINEERING) >= 300 && !player->HasSpell(22704))
-            player->CastSpell(player, 22864, false);
 
         return true;
     }
@@ -495,33 +475,33 @@ public:
         if (go->GetGoType() == GAMEOBJECT_TYPE_QUESTGIVER) /* != GAMEOBJECT_TYPE_QUESTGIVER) */
             player->PrepareQuestMenu(go->GetGUID()); /* return true*/
 
-        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
-        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
 
-        player->SEND_GOSSIP_MENU(GOSSIP_FEL_CRYSTALFORGE_TEXT, go->GetGUID());
+        SendGossipMenuFor(player, GOSSIP_FEL_CRYSTALFORGE_TEXT, go->GetGUID());
 
         return true;
     }
 
     bool OnGossipSelect(Player* player, GameObject* go, uint32 /*sender*/, uint32 action) override
     {
-        player->PlayerTalkClass->ClearMenus();
+        ClearGossipMenuFor(player);
         switch (action)
         {
             case GOSSIP_ACTION_INFO_DEF:
                 player->CastSpell(player, SPELL_CREATE_1_FLASK_OF_BEAST, false);
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_RETURN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-                player->SEND_GOSSIP_MENU(GOSSIP_FEL_CRYSTALFORGE_ITEM_TEXT_RETURN, go->GetGUID());
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_RETURN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+                SendGossipMenuFor(player, GOSSIP_FEL_CRYSTALFORGE_ITEM_TEXT_RETURN, go->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF + 1:
                 player->CastSpell(player, SPELL_CREATE_5_FLASK_OF_BEAST, false);
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_RETURN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-                player->SEND_GOSSIP_MENU(GOSSIP_FEL_CRYSTALFORGE_ITEM_TEXT_RETURN, go->GetGUID());
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_RETURN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+                SendGossipMenuFor(player, GOSSIP_FEL_CRYSTALFORGE_ITEM_TEXT_RETURN, go->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF + 2:
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-                player->SEND_GOSSIP_MENU(GOSSIP_FEL_CRYSTALFORGE_TEXT, go->GetGUID());
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_FEL_CRYSTALFORGE_ITEM_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+                SendGossipMenuFor(player, GOSSIP_FEL_CRYSTALFORGE_TEXT, go->GetGUID());
                 break;
         }
         return true;
@@ -554,33 +534,33 @@ public:
         if (go->GetGoType() == GAMEOBJECT_TYPE_QUESTGIVER) /* != GAMEOBJECT_TYPE_QUESTGIVER) */
             player->PrepareQuestMenu(go->GetGUID()); /* return true*/
 
-        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
-        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
 
-        player->SEND_GOSSIP_MENU(GOSSIP_BASHIR_CRYSTALFORGE_TEXT, go->GetGUID());
+        SendGossipMenuFor(player, GOSSIP_BASHIR_CRYSTALFORGE_TEXT, go->GetGUID());
 
         return true;
     }
 
     bool OnGossipSelect(Player* player, GameObject* go, uint32 /*sender*/, uint32 action) override
     {
-        player->PlayerTalkClass->ClearMenus();
+        ClearGossipMenuFor(player);
         switch (action)
         {
             case GOSSIP_ACTION_INFO_DEF:
                 player->CastSpell(player, SPELL_CREATE_1_FLASK_OF_SORCERER, false);
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_RETURN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-                player->SEND_GOSSIP_MENU(GOSSIP_BASHIR_CRYSTALFORGE_ITEM_TEXT_RETURN, go->GetGUID());
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_RETURN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+                SendGossipMenuFor(player, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_TEXT_RETURN, go->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF + 1:
                 player->CastSpell(player, SPELL_CREATE_5_FLASK_OF_SORCERER, false);
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_RETURN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
-                player->SEND_GOSSIP_MENU(GOSSIP_BASHIR_CRYSTALFORGE_ITEM_TEXT_RETURN, go->GetGUID());
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_RETURN, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+                SendGossipMenuFor(player, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_TEXT_RETURN, go->GetGUID());
                 break;
             case GOSSIP_ACTION_INFO_DEF + 2:
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-                player->SEND_GOSSIP_MENU(GOSSIP_BASHIR_CRYSTALFORGE_TEXT, go->GetGUID());
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_BASHIR_CRYSTALFORGE_ITEM_5, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+                SendGossipMenuFor(player, GOSSIP_BASHIR_CRYSTALFORGE_TEXT, go->GetGUID());
                 break;
         }
         return true;
@@ -807,7 +787,7 @@ public:
         if (player->GetQuestStatus(QUEST_SPIDER_GOLD) == QUEST_STATUS_INCOMPLETE)
             player->AreaExploredOrEventHappens(QUEST_SPIDER_GOLD);
 
-        player->SEND_GOSSIP_MENU(GOSSIP_TABLE_THEKA, go->GetGUID());
+        SendGossipMenuFor(player, GOSSIP_TABLE_THEKA, go->GetGUID());
 
         return true;
     }
@@ -1057,21 +1037,21 @@ public:
         QuestStatus status = player->GetQuestStatus(QUEST_DOING_YOUR_DUTY);
         if (status == QUEST_STATUS_INCOMPLETE || status == QUEST_STATUS_COMPLETE || status == QUEST_STATUS_REWARDED)
         {
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_USE_OUTHOUSE, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-            player->SEND_GOSSIP_MENU(GOSSIP_OUTHOUSE_VACANT, go->GetGUID());
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, GOSSIP_USE_OUTHOUSE, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            SendGossipMenuFor(player, GOSSIP_OUTHOUSE_VACANT, go->GetGUID());
         }
         else
-            player->SEND_GOSSIP_MENU(GOSSIP_OUTHOUSE_INUSE, go->GetGUID());
+            SendGossipMenuFor(player, GOSSIP_OUTHOUSE_INUSE, go->GetGUID());
 
         return true;
     }
 
     bool OnGossipSelect(Player* player, GameObject* go, uint32 /*sender*/, uint32 action) override
     {
-        player->PlayerTalkClass->ClearMenus();
+        ClearGossipMenuFor(player);
         if (action == GOSSIP_ACTION_INFO_DEF +1)
         {
-            player->CLOSE_GOSSIP_MENU();
+            CloseGossipMenuFor(player);
             Creature* target = GetClosestCreatureWithEntry(player, NPC_OUTHOUSE_BUNNY, 3.0f);
             if (target)
             {
@@ -1085,7 +1065,7 @@ public:
         }
         else
         {
-            player->CLOSE_GOSSIP_MENU();
+            CloseGossipMenuFor(player);
             player->GetSession()->SendNotification(GO_ANDERHOLS_SLIDER_CIDER_NOT_FOUND);
             return false;
         }
@@ -1130,69 +1110,6 @@ class go_massive_seaforium_charge : public GameObjectScript
 };
 
 /*######
-## go_gjalerbron_cage
-######*/
-
-enum OfKeysAndCages
-{
-    QUEST_ALLIANCE_OF_KEYS_AND_CAGES    = 11231,
-    QUEST_HORDE_OF_KEYS_AND_CAGES       = 11265,
-    NPC_GJALERBRON_PRISONER             = 24035,
-    SAY_FREE                            = 0,
-};
-
-class go_gjalerbron_cage : public GameObjectScript
-{
-    public:
-        go_gjalerbron_cage() : GameObjectScript("go_gjalerbron_cage") { }
-
-        bool OnGossipHello(Player* player, GameObject* go) override
-        {
-            go->UseDoorOrButton();
-            if ((player->GetTeamId() == TEAM_ALLIANCE && player->GetQuestStatus(QUEST_ALLIANCE_OF_KEYS_AND_CAGES) == QUEST_STATUS_INCOMPLETE) ||
-                (player->GetTeamId() == TEAM_HORDE && player->GetQuestStatus(QUEST_HORDE_OF_KEYS_AND_CAGES) == QUEST_STATUS_INCOMPLETE))
-            {
-                if (Creature* prisoner = go->FindNearestCreature(NPC_GJALERBRON_PRISONER, 5.0f))
-                {
-                    player->KilledMonsterCredit(NPC_GJALERBRON_PRISONER);
-
-                    prisoner->AI()->Talk(SAY_FREE);
-                    prisoner->DespawnOrUnsummon(6000);
-                }
-            }
-            return true;
-        }
-};
-
-/*########
-## go_large_gjalerbron_cage
-#####*/
-
-class go_large_gjalerbron_cage : public GameObjectScript
-{
-    public:
-        go_large_gjalerbron_cage() : GameObjectScript("go_large_gjalerbron_cage") { }
-
-        bool OnGossipHello(Player* player, GameObject* go) override
-        {
-            go->UseDoorOrButton();
-            if ((player->GetTeamId() == TEAM_ALLIANCE && player->GetQuestStatus(QUEST_ALLIANCE_OF_KEYS_AND_CAGES) == QUEST_STATUS_INCOMPLETE) ||
-                (player->GetTeamId() == TEAM_HORDE && player->GetQuestStatus(QUEST_HORDE_OF_KEYS_AND_CAGES) == QUEST_STATUS_INCOMPLETE))
-            {
-                std::list<Creature*> prisonerList;
-                GetCreatureListWithEntryInGrid(prisonerList, go, NPC_GJALERBRON_PRISONER, INTERACTION_DISTANCE);
-                for (std::list<Creature*>::const_iterator itr = prisonerList.begin(); itr != prisonerList.end(); ++itr)
-                {
-                    player->KilledMonsterCredit(NPC_GJALERBRON_PRISONER, (*itr)->GetGUID());
-                    (*itr)->DespawnOrUnsummon(6000);
-                    (*itr)->AI()->Talk(SAY_FREE);
-                }
-            }
-            return false;
-        }
-};
-
-/*########
 #### go_veil_skith_cage
 #####*/
 
@@ -1254,7 +1171,7 @@ public:
                 player->CastSpell(player, SPELL_CLEANSING_SOUL);
                 player->SetStandState(UNIT_STAND_STATE_SIT);
             }
-            return true;
+        return true;
     }
 };
 
@@ -1275,16 +1192,80 @@ public:
     bool OnGossipSelect(Player* player, GameObject* /*go*/, uint32 /*sender*/, uint32 /*action*/) override
     {
         player->CastSpell(player, STAMP_OUT_BONFIRE_QUEST_COMPLETE, true);
-        player->CLOSE_GOSSIP_MENU();
+        CloseGossipMenuFor(player);
         return false;
     }
+};
+
+enum MidsummerPoleRibbon
+{
+    SPELL_POLE_DANCE      = 29726,
+    SPELL_BLUE_FIRE_RING  = 46842,
+    NPC_POLE_RIBBON_BUNNY = 17066,
+    ACTION_COSMETIC_FIRES = 0
+};
+
+class go_midsummer_ribbon_pole : public GameObjectScript
+{
+public:
+    go_midsummer_ribbon_pole() : GameObjectScript("go_midsummer_ribbon_pole") { }
+
+    bool OnGossipHello(Player* player, GameObject* go) override
+    {
+        if (Creature* creature = go->FindNearestCreature(NPC_POLE_RIBBON_BUNNY, 10.0f))
+        {
+            creature->GetAI()->DoAction(ACTION_COSMETIC_FIRES);
+            player->CastSpell(creature, SPELL_POLE_DANCE, true);
+        }
+        return true;
+    }
+};
+
+enum ToyTrainSpells
+{
+    SPELL_TOY_TRAIN_PULSE       = 61551,
+};
+
+class go_toy_train_set : public GameObjectScript
+{
+    public:
+        go_toy_train_set() : GameObjectScript("go_toy_train_set") { }
+
+        struct go_toy_train_setAI : public GameObjectAI
+        {
+            go_toy_train_setAI(GameObject* go) : GameObjectAI(go), _pulseTimer(3 * IN_MILLISECONDS) { }
+
+            void UpdateAI(uint32 diff) override
+            {
+                if (diff < _pulseTimer)
+                    _pulseTimer -= diff;
+                else
+                {
+                    go->CastSpell(nullptr, SPELL_TOY_TRAIN_PULSE, true);
+                    _pulseTimer = 6 * IN_MILLISECONDS;
+                }
+            }
+
+            // triggered on wrecker'd
+            void DoAction(int32 /*action*/) override
+            {
+                go->Delete();
+            }
+
+        private:
+            uint32 _pulseTimer;
+        };
+
+        GameObjectAI* GetAI(GameObject* go) const override
+        {
+            return new go_toy_train_setAI(go);
+        }
 };
 
 void AddSC_go_scripts()
 {
     new go_cat_figurine();
     new go_barov_journal();
-    new go_field_repair_bot_74A();
     new go_gilded_brazier();
     new go_orb_of_command();
     new go_shrine_of_the_birds();
@@ -1313,9 +1294,9 @@ void AddSC_go_scripts()
     new go_amberpine_outhouse();
     new go_hive_pod();
     new go_massive_seaforium_charge();
-    new go_gjalerbron_cage();
-    new go_large_gjalerbron_cage();
     new go_veil_skith_cage();
     new go_frostblade_shrine();
     new go_midsummer_bonfire();
+    new go_midsummer_ribbon_pole();
+    new go_toy_train_set();
 }

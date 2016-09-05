@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,18 +21,32 @@
 
 DoorData const doorData[] =
 {
-    { GO_NAJENTUS_GATE,         DATA_HIGH_WARLORD_NAJENTUS, DOOR_TYPE_PASSAGE,  BOUNDARY_NONE },
-    { GO_NAJENTUS_GATE,         DATA_SUPREMUS,              DOOR_TYPE_ROOM,     BOUNDARY_NONE },
-    { GO_SUPREMUS_GATE,         DATA_SUPREMUS,              DOOR_TYPE_PASSAGE,  BOUNDARY_NONE },
-    { GO_SHADE_OF_AKAMA_DOOR,   DATA_SHADE_OF_AKAMA,        DOOR_TYPE_ROOM,     BOUNDARY_NONE },
-    { GO_TERON_DOOR_1,          DATA_TERON_GOREFIEND,       DOOR_TYPE_ROOM,     BOUNDARY_NONE },
-    { GO_TERON_DOOR_2,          DATA_TERON_GOREFIEND,       DOOR_TYPE_ROOM,     BOUNDARY_NONE },
-    { GO_GURTOGG_DOOR,          DATA_GURTOGG_BLOODBOIL,     DOOR_TYPE_PASSAGE,  BOUNDARY_NONE },
-    { GO_TEMPLE_DOOR,           DATA_RELIQUARY_OF_SOULS,    DOOR_TYPE_PASSAGE,  BOUNDARY_NONE },
-    { GO_MOTHER_SHAHRAZ_DOOR,   DATA_MOTHER_SHAHRAZ,        DOOR_TYPE_PASSAGE,  BOUNDARY_NONE },
-    { GO_COUNCIL_DOOR_1,        DATA_ILLIDARI_COUNCIL,      DOOR_TYPE_ROOM,     BOUNDARY_NONE },
-    { GO_COUNCIL_DOOR_2,        DATA_ILLIDARI_COUNCIL,      DOOR_TYPE_ROOM,     BOUNDARY_NONE },
-    { 0,                        0,                          DOOR_TYPE_ROOM,     BOUNDARY_NONE } // END
+    { GO_NAJENTUS_GATE,         DATA_HIGH_WARLORD_NAJENTUS, DOOR_TYPE_PASSAGE },
+    { GO_NAJENTUS_GATE,         DATA_SUPREMUS,              DOOR_TYPE_ROOM },
+    { GO_SUPREMUS_GATE,         DATA_SUPREMUS,              DOOR_TYPE_PASSAGE },
+    { GO_SHADE_OF_AKAMA_DOOR,   DATA_SHADE_OF_AKAMA,        DOOR_TYPE_ROOM },
+    { GO_TERON_DOOR_1,          DATA_TERON_GOREFIEND,       DOOR_TYPE_ROOM },
+    { GO_TERON_DOOR_2,          DATA_TERON_GOREFIEND,       DOOR_TYPE_ROOM },
+    { GO_GURTOGG_DOOR,          DATA_GURTOGG_BLOODBOIL,     DOOR_TYPE_PASSAGE },
+    { GO_TEMPLE_DOOR,           DATA_RELIQUARY_OF_SOULS,    DOOR_TYPE_PASSAGE },
+    { GO_MOTHER_SHAHRAZ_DOOR,   DATA_MOTHER_SHAHRAZ,        DOOR_TYPE_PASSAGE },
+    { GO_COUNCIL_DOOR_1,        DATA_ILLIDARI_COUNCIL,      DOOR_TYPE_ROOM },
+    { GO_COUNCIL_DOOR_2,        DATA_ILLIDARI_COUNCIL,      DOOR_TYPE_ROOM },
+    { 0,                        0,                          DOOR_TYPE_ROOM } // END
+};
+
+BossBoundaryData const boundaries =
+{
+    { DATA_HIGH_WARLORD_NAJENTUS, new RectangleBoundary(394.0f, 479.4f, 707.8f, 859.1f) },
+    { DATA_SUPREMUS, new RectangleBoundary(556.1f, 850.2f, 542.0f, 1001.0f) },
+    { DATA_SHADE_OF_AKAMA, new RectangleBoundary(406.8f, 564.0f, 327.9f, 473.5f) },
+    { DATA_TERON_GOREFIEND, new RectangleBoundary(512.5f, 613.3f, 373.2f, 432.0f) },
+    { DATA_TERON_GOREFIEND, new ZRangeBoundary(179.5f, 223.6f) },
+    { DATA_GURTOGG_BLOODBOIL, new RectangleBoundary(720.5f, 864.5f, 159.3f, 316.0f) },
+    { DATA_RELIQUARY_OF_SOULS, new RectangleBoundary(435.9f, 558.8f, 113.3f, 229.6f) },
+    { DATA_MOTHER_SHAHRAZ, new RectangleBoundary(903.4f, 982.1f, 92.4f, 476.7f) },
+    { DATA_ILLIDARI_COUNCIL, new EllipseBoundary(Position(696.6f, 305.0f), 70.0 , 85.0) },
+    { DATA_ILLIDAN_STORMRAGE, new EllipseBoundary(Position(694.8f, 309.0f), 70.0 , 85.0) }
 };
 
 class instance_black_temple : public InstanceMapScript
@@ -47,6 +61,7 @@ class instance_black_temple : public InstanceMapScript
                 SetHeaders(DataHeader);
                 SetBossNumber(EncounterCount);
                 LoadDoorData(doorData);
+                LoadBossBoundaries(boundaries);
             }
 
             void OnCreatureCreate(Creature* creature) override

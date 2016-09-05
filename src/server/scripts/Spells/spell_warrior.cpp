@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,6 +23,7 @@
 
 #include "Player.h"
 #include "ScriptMgr.h"
+#include "SpellHistory.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
 
@@ -270,12 +271,12 @@ class spell_warr_deep_wounds : public SpellScriptLoader
                 {
                     ApplyPct(damage, 16 * GetSpellInfo()->GetRank());
 
-                    SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(SPELL_WARRIOR_DEEP_WOUNDS_PERIODIC);
+                    SpellInfo const* spellInfo = sSpellMgr->AssertSpellInfo(SPELL_WARRIOR_DEEP_WOUNDS_PERIODIC);
                     uint32 ticks = uint32(spellInfo->GetDuration()) / spellInfo->Effects[EFFECT_0].Amplitude;
 
                     // Add remaining ticks to damage done
                     if (AuraEffect const* aurEff = target->GetAuraEffect(SPELL_WARRIOR_DEEP_WOUNDS_PERIODIC, EFFECT_0, caster->GetGUID()))
-                        damage += aurEff->GetDamage() * int32(ticks - aurEff->GetTickNumber());
+                        damage += (aurEff->GetAmount() + aurEff->GetBonusAmount()) * aurEff->GetDonePct() * int32(ticks - aurEff->GetTickNumber());
 
                     damage /= int32(ticks);
 
@@ -847,7 +848,7 @@ class spell_warr_vigilance_trigger : public SpellScriptLoader
 
                 // Remove Taunt cooldown
                 if (Player* target = GetHitPlayer())
-                    target->RemoveSpellCooldown(SPELL_WARRIOR_TAUNT, true);
+                    target->GetSpellHistory()->ResetCooldown(SPELL_WARRIOR_TAUNT, true);
             }
 
             void Register() override

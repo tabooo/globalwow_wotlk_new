@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,10 +19,9 @@
 #ifndef _MMAP_COMMON_H
 #define _MMAP_COMMON_H
 
-#include <string>
-#include <vector>
-
 #include "Common.h"
+
+#include <vector>
 
 #ifndef _WIN32
     #include <stddef.h>
@@ -62,7 +61,7 @@ namespace MMAP
                 if (*++filter == '\0')   // wildcard at end of filter means all remaing chars match
                     return true;
 
-                while (true)
+                for (;;)
                 {
                     if (*filter == *str)
                         break;

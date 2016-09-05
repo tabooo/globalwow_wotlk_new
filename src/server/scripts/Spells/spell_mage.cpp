@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,11 +23,13 @@
 
 #include "Player.h"
 #include "ScriptMgr.h"
+#include "SpellHistory.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
 
 enum MageSpells
 {
+    SPELL_MAGE_BLAZING_SPEED                     = 31643,
     SPELL_MAGE_BURNOUT                           = 29077,
     SPELL_MAGE_COLD_SNAP                         = 11958,
     SPELL_MAGE_FOCUS_MAGIC_PROC                  = 54648,
@@ -44,9 +46,15 @@ enum MageSpells
     SPELL_MAGE_WORGEN_FORM                       = 32819,
     SPELL_MAGE_SHEEP_FORM                        = 32820,
     SPELL_MAGE_GLYPH_OF_ETERNAL_WATER            = 70937,
+    SPELL_MAGE_SHATTERED_BARRIER                 = 55080,
     SPELL_MAGE_SUMMON_WATER_ELEMENTAL_PERMANENT  = 70908,
     SPELL_MAGE_SUMMON_WATER_ELEMENTAL_TEMPORARY  = 70907,
     SPELL_MAGE_GLYPH_OF_BLAST_WAVE               = 62126,
+};
+
+enum MageSpellIcons
+{
+    SPELL_ICON_MAGE_SHATTERED_BARRIER = 2945
 };
 
 // Incanter's Absorbtion
@@ -107,6 +115,42 @@ class spell_mage_blast_wave : public SpellScriptLoader
         {
             return new spell_mage_blast_wave_SpellScript();
         }
+};
+
+// -31641 - Blazing Speed
+class spell_mage_blazing_speed : public SpellScriptLoader
+{
+public:
+    spell_mage_blazing_speed() : SpellScriptLoader("spell_mage_blazing_speed") { }
+
+    class spell_mage_blazing_speed_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_mage_blazing_speed_AuraScript);
+
+        bool Validate(SpellInfo const* /*spellInfo*/) override
+        {
+            if (!sSpellMgr->GetSpellInfo(SPELL_MAGE_BLAZING_SPEED))
+                return false;
+            return true;
+        }
+
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+        {
+            PreventDefaultAction();
+            if (Unit* target = eventInfo.GetActionTarget())
+                target->CastSpell(target, SPELL_MAGE_BLAZING_SPEED, true, nullptr, aurEff);
+        }
+
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_mage_blazing_speed_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_mage_blazing_speed_AuraScript();
+    }
 };
 
 // -44449 - Burnout
@@ -171,22 +215,12 @@ class spell_mage_cold_snap : public SpellScriptLoader
 
             void HandleDummy(SpellEffIndex /*effIndex*/)
             {
-                Player* caster = GetCaster()->ToPlayer();
-                // immediately finishes the cooldown on Frost spells
-                const SpellCooldowns& cm = caster->GetSpellCooldownMap();
-                for (SpellCooldowns::const_iterator itr = cm.begin(); itr != cm.end();)
+                GetCaster()->GetSpellHistory()->ResetCooldowns([](SpellHistory::CooldownStorageType::iterator itr) -> bool
                 {
-                    SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(itr->first);
-
-                    if (spellInfo->SpellFamilyName == SPELLFAMILY_MAGE &&
-                        (spellInfo->GetSchoolMask() & SPELL_SCHOOL_MASK_FROST) &&
-                        spellInfo->Id != SPELL_MAGE_COLD_SNAP && spellInfo->GetRecoveryTime() > 0)
-                    {
-                        caster->RemoveSpellCooldown((itr++)->first, true);
-                    }
-                    else
-                        ++itr;
-                }
+                    SpellInfo const* spellInfo = sSpellMgr->AssertSpellInfo(itr->first);
+                    return spellInfo->SpellFamilyName == SPELLFAMILY_MAGE && (spellInfo->GetSchoolMask() & SPELL_SCHOOL_MASK_FROST) &&
+                        spellInfo->Id != SPELL_MAGE_COLD_SNAP && spellInfo->GetRecoveryTime() > 0;
+                }, true);
             }
 
             void Register() override
@@ -330,6 +364,13 @@ class spell_mage_ice_barrier : public SpellScriptLoader
         {
             PrepareAuraScript(spell_mage_ice_barrier_AuraScript);
 
+            bool Validate(SpellInfo const* /*spellInfo*/) override
+            {
+                if (!sSpellMgr->GetSpellInfo(SPELL_MAGE_SHATTERED_BARRIER))
+                    return false;
+                return true;
+            }
+
             void CalculateAmount(AuraEffect const* aurEff, int32& amount, bool& canBeRecalculated)
             {
                 canBeRecalculated = false;
@@ -350,10 +391,22 @@ class spell_mage_ice_barrier : public SpellScriptLoader
                 }
             }
 
+            void AfterRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+            {
+                // Shattered Barrier
+                // Procs only if removed by damage.
+                if (aurEff->GetAmount() <= 0)
+                    if (Unit* caster = GetCaster())
+                        if (AuraEffect* dummy = caster->GetDummyAuraEffect(SPELLFAMILY_MAGE, SPELL_ICON_MAGE_SHATTERED_BARRIER, EFFECT_0))
+                            if (roll_chance_i(dummy->GetSpellInfo()->ProcChance))
+                                caster->CastSpell(GetTarget(), SPELL_MAGE_SHATTERED_BARRIER, true, nullptr, aurEff);
+            }
+
             void Register() override
             {
                 DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_mage_ice_barrier_AuraScript::CalculateAmount, EFFECT_0, SPELL_AURA_SCHOOL_ABSORB);
                 AfterEffectAbsorb += AuraEffectAbsorbFn(spell_mage_ice_barrier_AuraScript::Trigger, EFFECT_0);
+                AfterEffectRemove += AuraEffectRemoveFn(spell_mage_ice_barrier_AuraScript::AfterRemove, EFFECT_0, SPELL_AURA_SCHOOL_ABSORB, AURA_EFFECT_HANDLE_REAL);
             }
         };
 
@@ -389,7 +442,7 @@ class spell_mage_ignite : public SpellScriptLoader
             {
                 PreventDefaultAction();
 
-                SpellInfo const* igniteDot = sSpellMgr->EnsureSpellInfo(SPELL_MAGE_IGNITE);
+                SpellInfo const* igniteDot = sSpellMgr->AssertSpellInfo(SPELL_MAGE_IGNITE);
                 int32 pct = 8 * GetSpellInfo()->GetRank();
 
                 int32 amount = int32(CalculatePct(eventInfo.GetDamageInfo()->GetDamage(), pct) / igniteDot->GetMaxTicks());
@@ -631,6 +684,7 @@ class spell_mage_summon_water_elemental : public SpellScriptLoader
 void AddSC_mage_spell_scripts()
 {
     new spell_mage_blast_wave();
+    new spell_mage_blazing_speed();
     new spell_mage_burnout();
     new spell_mage_cold_snap();
     new spell_mage_fire_frost_ward();

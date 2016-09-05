@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -19,8 +19,6 @@
 #include "ThreatManager.h"
 #include "Unit.h"
 #include "Creature.h"
-#include "CreatureAI.h"
-#include "Map.h"
 #include "Player.h"
 #include "ObjectAccessor.h"
 #include "UnitEvents.h"
@@ -79,7 +77,7 @@ bool ThreatCalcHelper::isValidProcess(Unit* hatedUnit, Unit* hatingUnit, SpellIn
         return false;
 
     // spell not causing threat
-    if (threatSpell && threatSpell->AttributesEx & SPELL_ATTR1_NO_THREAT)
+    if (threatSpell && threatSpell->HasAttribute(SPELL_ATTR1_NO_THREAT))
         return false;
 
     ASSERT(hatingUnit->GetTypeId() == TYPEID_UNIT);
@@ -337,7 +335,7 @@ HostileReference* ThreatContainer::selectNextVictim(Creature* attacker, HostileR
             {
                 // current victim is a second choice target, so don't compare threat with it below
                 if (currentRef == currentVictim)
-                    currentVictim = NULL;
+                    currentVictim = nullptr;
                 ++iter;
                 continue;
             }
@@ -439,12 +437,15 @@ void ThreatManager::_addThreat(Unit* victim, float threat)
 
     if (!ref) // there was no ref => create a new one
     {
+        bool isFirst = iThreatContainer.empty();
                                                             // threat has to be 0 here
         HostileReference* hostileRef = new HostileReference(victim, this, 0);
         iThreatContainer.addReference(hostileRef);
         hostileRef->addThreat(threat); // now we add the real threat
         if (victim->GetTypeId() == TYPEID_PLAYER && victim->ToPlayer()->IsGameMaster())
             hostileRef->setOnlineOfflineState(false); // GM is always offline
+        else if (isFirst)
+            setCurrentVictim(hostileRef);
     }
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -29,6 +29,7 @@
 
 enum PriestSpells
 {
+    SPELL_PRIEST_BLESSED_RECOVERY_R1                = 27813,
     SPELL_PRIEST_DIVINE_AEGIS                       = 47753,
     SPELL_PRIEST_EMPOWERED_RENEW                    = 63544,
     SPELL_PRIEST_GLYPH_OF_CIRCLE_OF_HEALING         = 55675,
@@ -86,6 +87,50 @@ class RaidCheck
 
     private:
         Unit const* _caster;
+};
+
+// -27811 - Blessed Recovery
+class spell_pri_blessed_recovery : public SpellScriptLoader
+{
+public:
+    spell_pri_blessed_recovery() : SpellScriptLoader("spell_pri_blessed_recovery") { }
+
+    class spell_pri_blessed_recovery_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_pri_blessed_recovery_AuraScript);
+
+        bool Validate(SpellInfo const* /*spellInfo*/) override
+        {
+            if (!sSpellMgr->GetSpellInfo(SPELL_PRIEST_BLESSED_RECOVERY_R1))
+                return false;
+            return true;
+        }
+
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+        {
+            PreventDefaultAction();
+            if (DamageInfo* dmgInfo = eventInfo.GetDamageInfo())
+            {
+                if (Unit* target = eventInfo.GetActionTarget())
+                {
+                    uint32 triggerSpell = sSpellMgr->GetSpellWithRank(SPELL_PRIEST_BLESSED_RECOVERY_R1, aurEff->GetSpellInfo()->GetRank());
+                    uint32 bp = CalculatePct(int32(dmgInfo->GetDamage()), aurEff->GetAmount()) / 3;
+                    bp += target->GetRemainingPeriodicAmount(target->GetGUID(), triggerSpell, SPELL_AURA_PERIODIC_HEAL);
+                    target->CastCustomSpell(triggerSpell, SPELLVALUE_BASE_POINT0, bp, target, true, nullptr, aurEff);
+                }
+            }
+        }
+
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_pri_blessed_recovery_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_pri_blessed_recovery_AuraScript();
+    }
 };
 
 // -34861 - Circle of Healing
@@ -236,7 +281,7 @@ class spell_pri_glyph_of_prayer_of_healing : public SpellScriptLoader
             {
                 PreventDefaultAction();
 
-                SpellInfo const* triggeredSpellInfo = sSpellMgr->EnsureSpellInfo(SPELL_PRIEST_GLYPH_OF_PRAYER_OF_HEALING_HEAL);
+                SpellInfo const* triggeredSpellInfo = sSpellMgr->AssertSpellInfo(SPELL_PRIEST_GLYPH_OF_PRAYER_OF_HEALING_HEAL);
                 int32 heal = int32(CalculatePct(int32(eventInfo.GetHealInfo()->GetHeal()), aurEff->GetAmount()) / triggeredSpellInfo->GetMaxTicks());
                 GetTarget()->CastCustomSpell(SPELL_PRIEST_GLYPH_OF_PRAYER_OF_HEALING_HEAL, SPELLVALUE_BASE_POINT0, heal, eventInfo.GetProcTarget(), true, NULL, aurEff);
             }
@@ -544,9 +589,7 @@ class spell_pri_pain_and_suffering_proc : public SpellScriptLoader
                 if (Unit* target = GetHitUnit())
                     if (AuraEffect* aur = target->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_PRIEST, 0x8000, 0, 0, caster->GetGUID()))
                     {
-                        uint32 damage = std::max(aur->GetAmount(), 0);
-                        sScriptMgr->ModifyPeriodicDamageAurasTick(target, caster, damage);
-                        aur->SetDamage(caster->SpellDamageBonusDone(target, aur->GetSpellInfo(), damage, DOT) * aur->GetDonePct());
+                        aur->SetBonusAmount(caster->SpellDamageBonusDone(target, aur->GetSpellInfo(), 0, DOT));
                         aur->CalculatePeriodic(caster, false, false);
                         aur->GetBase()->RefreshDuration();
                     }
@@ -619,8 +662,13 @@ class spell_pri_penance : public SpellScriptLoader
             {
                 Player* caster = GetCaster()->ToPlayer();
                 if (Unit* target = GetExplTargetUnit())
-                    if (!caster->IsFriendlyTo(target) && !caster->IsValidAttackTarget(target))
-                        return SPELL_FAILED_BAD_TARGETS;
+                    if (!caster->IsFriendlyTo(target))
+                    {
+                        if (!caster->IsValidAttackTarget(target))
+                            return SPELL_FAILED_BAD_TARGETS;
+                        if (!caster->isInFront(target))
+                            return SPELL_FAILED_UNIT_NOT_INFRONT;
+                    }
                 return SPELL_CAST_OK;
             }
 
@@ -866,6 +914,7 @@ class spell_pri_vampiric_touch : public SpellScriptLoader
 
 void AddSC_priest_spell_scripts()
 {
+    new spell_pri_blessed_recovery();
     new spell_pri_circle_of_healing();
     new spell_pri_divine_aegis();
     new spell_pri_divine_hymn();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,6 +16,7 @@
  */
 
 #include "InstanceScript.h"
+#include "Vehicle.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
 #include "ScriptMgr.h"
@@ -23,26 +24,43 @@
 #include "WorldPacket.h"
 #include "ulduar.h"
 
+static BossBoundaryData const boundaries =
+{
+    { BOSS_LEVIATHAN, new RectangleBoundary(148.0f, 401.3f, -155.0f, 90.0f) },
+    { BOSS_IGNIS, new RectangleBoundary(495.0f, 680.0f, 90.0f, 400.0f) },
+    { BOSS_RAZORSCALE, new RectangleBoundary(370.0f, 810.0f, -542.0f, -55.0f) },
+    { BOSS_XT002, new RectangleBoundary(755.0f, 940.0f, -125.0f, 95.0f) },
+    { BOSS_ASSEMBLY_OF_IRON, new CircleBoundary(Position(1587.2f, 121.0f), 90.0) },
+    { BOSS_ALGALON, new CircleBoundary(Position(1632.668f, -307.7656f), 45.0) },
+    { BOSS_ALGALON, new ZRangeBoundary(410.0f, 440.0f) },
+    { BOSS_HODIR, new EllipseBoundary(Position(2001.5f, -240.0f), 50.0, 75.0) },
+    { BOSS_THORIM, new CircleBoundary(Position(2134.73f, -263.2f), 50.0) },
+    { BOSS_FREYA, new RectangleBoundary(2094.6f, 2520.0f, -250.0f, 200.0f) },
+    { BOSS_MIMIRON, new CircleBoundary(Position(2744.0f, 2569.0f), 70.0) },
+    { BOSS_VEZAX, new RectangleBoundary(1740.0f, 1930.0f, 31.0f, 228.0f) },
+    { BOSS_YOGG_SARON, new CircleBoundary(Position(1980.42f, -27.68f), 105.0) }
+};
+
 static DoorData const doorData[] =
 {
-    { GO_LEVIATHAN_DOOR,                BOSS_LEVIATHAN,         DOOR_TYPE_ROOM,         BOUNDARY_S      },
-    { GO_XT_002_DOOR,                   BOSS_XT002,             DOOR_TYPE_ROOM,         BOUNDARY_S      },
-    { GO_IRON_COUNCIL_DOOR,             BOSS_ASSEMBLY_OF_IRON,  DOOR_TYPE_ROOM,         BOUNDARY_N      },
-    { GO_ARCHIVUM_DOOR,                 BOSS_ASSEMBLY_OF_IRON,  DOOR_TYPE_PASSAGE,      BOUNDARY_S      },
-    { GO_HODIR_ENTRANCE,                BOSS_HODIR,             DOOR_TYPE_ROOM,         BOUNDARY_E      },
-    { GO_HODIR_DOOR,                    BOSS_HODIR,             DOOR_TYPE_PASSAGE,      BOUNDARY_NONE   },
-    { GO_HODIR_ICE_DOOR,                BOSS_HODIR,             DOOR_TYPE_PASSAGE,      BOUNDARY_W      },
-    { GO_MIMIRON_DOOR_1,                BOSS_MIMIRON,           DOOR_TYPE_ROOM,         BOUNDARY_W      },
-    { GO_MIMIRON_DOOR_2,                BOSS_MIMIRON,           DOOR_TYPE_ROOM,         BOUNDARY_E      },
-    { GO_MIMIRON_DOOR_3,                BOSS_MIMIRON,           DOOR_TYPE_ROOM,         BOUNDARY_S      },
-    { GO_VEZAX_DOOR,                    BOSS_VEZAX,             DOOR_TYPE_PASSAGE,      BOUNDARY_E      },
-    { GO_YOGG_SARON_DOOR,               BOSS_YOGG_SARON,        DOOR_TYPE_ROOM,         BOUNDARY_S      },
-    { GO_DOODAD_UL_SIGILDOOR_03,        BOSS_ALGALON,           DOOR_TYPE_ROOM,         BOUNDARY_W      },
-    { GO_DOODAD_UL_UNIVERSEFLOOR_01,    BOSS_ALGALON,           DOOR_TYPE_ROOM,         BOUNDARY_NONE   },
-    { GO_DOODAD_UL_UNIVERSEFLOOR_02,    BOSS_ALGALON,           DOOR_TYPE_SPAWN_HOLE,   BOUNDARY_NONE   },
-    { GO_DOODAD_UL_UNIVERSEGLOBE01,     BOSS_ALGALON,           DOOR_TYPE_SPAWN_HOLE,   BOUNDARY_NONE   },
-    { GO_DOODAD_UL_ULDUAR_TRAPDOOR_03,  BOSS_ALGALON,           DOOR_TYPE_SPAWN_HOLE,   BOUNDARY_NONE   },
-    { 0,                                0,                      DOOR_TYPE_ROOM,         BOUNDARY_NONE   },
+    { GO_LEVIATHAN_DOOR,                BOSS_LEVIATHAN,         DOOR_TYPE_ROOM },
+    { GO_XT_002_DOOR,                   BOSS_XT002,             DOOR_TYPE_ROOM },
+    { GO_IRON_COUNCIL_DOOR,             BOSS_ASSEMBLY_OF_IRON,  DOOR_TYPE_ROOM },
+    { GO_ARCHIVUM_DOOR,                 BOSS_ASSEMBLY_OF_IRON,  DOOR_TYPE_PASSAGE },
+    { GO_HODIR_ENTRANCE,                BOSS_HODIR,             DOOR_TYPE_ROOM },
+    { GO_HODIR_DOOR,                    BOSS_HODIR,             DOOR_TYPE_PASSAGE },
+    { GO_HODIR_ICE_DOOR,                BOSS_HODIR,             DOOR_TYPE_PASSAGE },
+    { GO_MIMIRON_DOOR_1,                BOSS_MIMIRON,           DOOR_TYPE_ROOM },
+    { GO_MIMIRON_DOOR_2,                BOSS_MIMIRON,           DOOR_TYPE_ROOM },
+    { GO_MIMIRON_DOOR_3,                BOSS_MIMIRON,           DOOR_TYPE_ROOM },
+    { GO_VEZAX_DOOR,                    BOSS_VEZAX,             DOOR_TYPE_PASSAGE },
+    { GO_YOGG_SARON_DOOR,               BOSS_YOGG_SARON,        DOOR_TYPE_ROOM },
+    { GO_DOODAD_UL_SIGILDOOR_03,        BOSS_ALGALON,           DOOR_TYPE_ROOM },
+    { GO_DOODAD_UL_UNIVERSEFLOOR_01,    BOSS_ALGALON,           DOOR_TYPE_ROOM },
+    { GO_DOODAD_UL_UNIVERSEFLOOR_02,    BOSS_ALGALON,           DOOR_TYPE_SPAWN_HOLE },
+    { GO_DOODAD_UL_UNIVERSEGLOBE01,     BOSS_ALGALON,           DOOR_TYPE_SPAWN_HOLE },
+    { GO_DOODAD_UL_ULDUAR_TRAPDOOR_03,  BOSS_ALGALON,           DOOR_TYPE_SPAWN_HOLE },
+    { 0,                                0,                      DOOR_TYPE_ROOM },
 };
 
 MinionData const minionData[] =
@@ -51,6 +69,15 @@ MinionData const minionData[] =
     { NPC_MOLGEIM,        BOSS_ASSEMBLY_OF_IRON },
     { NPC_BRUNDIR,        BOSS_ASSEMBLY_OF_IRON },
     { 0,                  0,                    }
+};
+
+ObjectData const creatureData[] =
+{
+    { NPC_BRANN_BRONZEBEARD_INTRO,  DATA_BRANN_BRONZEBEARD_INTRO  },
+    { NPC_LORE_KEEPER_OF_NORGANNON, DATA_LORE_KEEPER_OF_NORGANNON },
+    { NPC_HIGH_EXPLORER_DELLORAH,   DATA_DELLORAH                 },
+    { NPC_BRONZEBEARD_RADIO,        DATA_BRONZEBEARD_RADIO        },
+    { 0,                            0,                            }
 };
 
 class instance_ulduar : public InstanceMapScript
@@ -64,9 +91,10 @@ class instance_ulduar : public InstanceMapScript
             {
                 SetHeaders(DataHeader);
                 SetBossNumber(MAX_ENCOUNTER);
-
+                LoadBossBoundaries(boundaries);
                 LoadDoorData(doorData);
                 LoadMinionData(minionData);
+                LoadObjectData(creatureData, nullptr);
 
                 _algalonTimer = 61;
                 _maxArmorItemLevel = 0;
@@ -78,10 +106,12 @@ class instance_ulduar : public InstanceMapScript
                 illusion = 0;
                 keepersCount = 0;
                 conSpeedAtory = false;
+                lumberjacked = false;
                 Unbroken = true;
                 IsDriveMeCrazyEligible = true;
                 _algalonSummoned = false;
                 _summonAlgalon = false;
+                _CoUAchivePlayerDeathMask = 0;
 
                 memset(_summonObservationRingKeeper, 0, sizeof(_summonObservationRingKeeper));
                 memset(_summonYSKeeper, 0, sizeof(_summonYSKeeper));
@@ -89,6 +119,7 @@ class instance_ulduar : public InstanceMapScript
 
             // Creatures
             ObjectGuid LeviathanGUID;
+            GuidVector LeviathanVehicleGUIDs;
             ObjectGuid IgnisGUID;
             ObjectGuid RazorscaleGUID;
             ObjectGuid RazorscaleController;
@@ -102,6 +133,7 @@ class instance_ulduar : public InstanceMapScript
             ObjectGuid ThorimGUID;
             ObjectGuid FreyaGUID;
             ObjectGuid ElderGUIDs[3];
+            ObjectGuid FreyaAchieveTriggerGUID;
             ObjectGuid MimironGUID;
             ObjectGuid MimironVehicleGUIDs[3];
             ObjectGuid MimironComputerGUID;
@@ -141,6 +173,7 @@ class instance_ulduar : public InstanceMapScript
             uint8 illusion;
             uint8 keepersCount;
             bool conSpeedAtory;
+            bool lumberjacked;
             bool Unbroken;
             bool IsDriveMeCrazyEligible;
 
@@ -212,6 +245,11 @@ class instance_ulduar : public InstanceMapScript
                 {
                     case NPC_LEVIATHAN:
                         LeviathanGUID = creature->GetGUID();
+                        break;
+                    case NPC_SALVAGED_DEMOLISHER:
+                    case NPC_SALVAGED_SIEGE_ENGINE:
+                    case NPC_SALVAGED_CHOPPER:
+                        LeviathanVehicleGUIDs.push_back(creature->GetGUID());
                         break;
                     case NPC_IGNIS:
                         IgnisGUID = creature->GetGUID();
@@ -321,7 +359,10 @@ class instance_ulduar : public InstanceMapScript
                         ElderGUIDs[2] = creature->GetGUID();
                         if (GetBossState(BOSS_FREYA) == DONE)
                             creature->DespawnOrUnsummon();
-                         break;
+                        break;
+                    case NPC_FREYA_ACHIEVE_TRIGGER:
+                        FreyaAchieveTriggerGUID = creature->GetGUID();
+                        break;
 
                     // Mimiron
                     case NPC_MIMIRON:
@@ -406,6 +447,8 @@ class instance_ulduar : public InstanceMapScript
                             algalon->AI()->JustSummoned(creature);
                         break;
                 }
+
+                InstanceScript::OnCreatureCreate(creature);
             }
 
             void OnCreatureRemove(Creature* creature) override
@@ -432,9 +475,11 @@ class instance_ulduar : public InstanceMapScript
                     default:
                         break;
                 }
+
+                InstanceScript::OnCreatureRemove(creature);
             }
 
-            void OnGameObjectCreate(GameObject* gameObject)
+            void OnGameObjectCreate(GameObject* gameObject) override
             {
                 switch (gameObject->GetEntry())
                 {
@@ -586,6 +631,19 @@ class instance_ulduar : public InstanceMapScript
 
             void OnUnitDeath(Unit* unit) override
             {
+                // Champion/Conqueror of Ulduar
+                if (unit->GetTypeId() == TYPEID_PLAYER)
+                {
+                    for (uint8 i = 0; i < BOSS_ALGALON; i++)
+                    {
+                        if (GetBossState(i) == IN_PROGRESS)
+                        {
+                            _CoUAchivePlayerDeathMask |= (1 << i);
+                            SaveToDB();
+                        }
+                    }
+                }
+
                 Creature* creature = unit->ToCreature();
                 if (!creature)
                     return;
@@ -604,6 +662,15 @@ class instance_ulduar : public InstanceMapScript
                         {
                             DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, CRITERIA_CON_SPEED_ATORY);
                             conSpeedAtory = true;
+                        }
+                        break;
+                    case NPC_IRONBRANCH:
+                    case NPC_STONEBARK:
+                    case NPC_BRIGHTLEAF:
+                        if (!lumberjacked)
+                        {
+                            DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, CRITERIA_LUMBERJACKED);
+                            lumberjacked = true;
                         }
                         break;
                     default:
@@ -653,6 +720,9 @@ class instance_ulduar : public InstanceMapScript
                 switch (type)
                 {
                     case BOSS_LEVIATHAN:
+                        if (state == DONE)
+                            _events.ScheduleEvent(EVENT_DESPAWN_LEVIATHAN_VEHICLES, 5 * IN_MILLISECONDS);
+                        break;
                     case BOSS_IGNIS:
                     case BOSS_RAZORSCALE:
                     case BOSS_XT002:
@@ -668,6 +738,13 @@ class instance_ulduar : public InstanceMapScript
                     case BOSS_FREYA:
                         if (state == DONE)
                             instance->SummonCreature(NPC_FREYA_OBSERVATION_RING, ObservationRingKeepersPos[0]);
+                        break;
+                    case BOSS_IRONBRANCH:
+                    case BOSS_STONEBARK:
+                    case BOSS_BRIGHTLEAF:
+                        if (GetBossState(BOSS_BRIGHTLEAF) == DONE && GetBossState(BOSS_IRONBRANCH) == DONE && GetBossState(BOSS_STONEBARK) == DONE && GetBossState(BOSS_FREYA) != DONE)
+                            if (Creature* trigger = instance->GetCreature(FreyaAchieveTriggerGUID))
+                                trigger->CastSpell(trigger, SPELL_LUMBERJACKED_CREDIT, true);
                         break;
                     case BOSS_KOLOGARN:
                         if (state == DONE)
@@ -758,12 +835,9 @@ class instance_ulduar : public InstanceMapScript
                 {
                     case DATA_COLOSSUS:
                         ColossusData = data;
-                        if (data == 2)
+                        if (data == 2 && GetBossState(BOSS_LEVIATHAN) == NOT_STARTED)
                         {
-                            if (Creature* Leviathan = instance->GetCreature(LeviathanGUID))
-                                Leviathan->AI()->DoAction(ACTION_MOVE_TO_CENTER_POSITION);
-                            if (GameObject* gameObject = instance->GetGameObject(LeviathanGateGUID))
-                                gameObject->SetGoState(GO_STATE_ACTIVE_ALTERNATIVE);
+                            _events.ScheduleEvent(EVENT_LEVIATHAN_BREAK_DOOR, 5 * IN_MILLISECONDS);
                             SaveToDB();
                         }
                         break;
@@ -985,6 +1059,45 @@ class instance_ulduar : public InstanceMapScript
                     case CRITERIA_ALONE_IN_THE_DARKNESS_10:
                     case CRITERIA_ALONE_IN_THE_DARKNESS_25:
                         return keepersCount == 0;
+                    case CRITERIA_C_O_U_LEVIATHAN_10:
+                    case CRITERIA_C_O_U_LEVIATHAN_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_LEVIATHAN)) == 0;
+                    case CRITERIA_C_O_U_IGNIS_10:
+                    case CRITERIA_C_O_U_IGNIS_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_IGNIS)) == 0;
+                    case CRITERIA_C_O_U_RAZORSCALE_10:
+                    case CRITERIA_C_O_U_RAZORSCALE_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_RAZORSCALE)) == 0;
+                    case CRITERIA_C_O_U_XT002_10:
+                    case CRITERIA_C_O_U_XT002_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_XT002)) == 0;
+                    case CRITERIA_C_O_U_IRON_COUNCIL_10:
+                    case CRITERIA_C_O_U_IRON_COUNCIL_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_ASSEMBLY_OF_IRON)) == 0;
+                    case CRITERIA_C_O_U_KOLOGARN_10:
+                    case CRITERIA_C_O_U_KOLOGARN_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_KOLOGARN)) == 0;
+                    case CRITERIA_C_O_U_AURIAYA_10:
+                    case CRITERIA_C_O_U_AURIAYA_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_AURIAYA)) == 0;
+                    case CRITERIA_C_O_U_HODIR_10:
+                    case CRITERIA_C_O_U_HODIR_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_HODIR)) == 0;
+                    case CRITERIA_C_O_U_THORIM_10:
+                    case CRITERIA_C_O_U_THORIM_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_THORIM)) == 0;
+                    case CRITERIA_C_O_U_FREYA_10:
+                    case CRITERIA_C_O_U_FREYA_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_FREYA)) == 0;
+                    case CRITERIA_C_O_U_MIMIRON_10:
+                    case CRITERIA_C_O_U_MIMIRON_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_MIMIRON)) == 0;
+                    case CRITERIA_C_O_U_VEZAX_10:
+                    case CRITERIA_C_O_U_VEZAX_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_VEZAX)) == 0;
+                    case CRITERIA_C_O_U_YOGG_SARON_10:
+                    case CRITERIA_C_O_U_YOGG_SARON_25:
+                        return (_CoUAchivePlayerDeathMask & (1 << BOSS_YOGG_SARON)) == 0;
                 }
 
                 return false;
@@ -996,6 +1109,8 @@ class instance_ulduar : public InstanceMapScript
 
                 for (uint8 i = 0; i < 4; ++i)
                     data << ' ' << uint32(KeeperGUIDs[i] ? 1 : 0);
+
+                data << ' ' << _CoUAchivePlayerDeathMask;
             }
 
             void ReadSaveDataMore(std::istringstream& data) override
@@ -1034,6 +1149,8 @@ class instance_ulduar : public InstanceMapScript
                     _summonObservationRingKeeper[2] = true;
                 if (GetBossState(BOSS_MIMIRON) == DONE && !_summonYSKeeper[3])
                     _summonObservationRingKeeper[3] = true;
+
+                data >> _CoUAchivePlayerDeathMask;
             }
 
             void Update(uint32 diff) override
@@ -1060,8 +1177,58 @@ class instance_ulduar : public InstanceMapScript
                                     algalon->AI()->DoAction(EVENT_DESPAWN_ALGALON);
                             }
                             break;
+                        case EVENT_DESPAWN_LEVIATHAN_VEHICLES:
+                            // Eject all players from vehicles and make them untargetable.
+                            // They will be despawned after a while
+                            for (auto const& vehicleGuid : LeviathanVehicleGUIDs)
+                            {
+                                if (Creature* vehicleCreature = instance->GetCreature(vehicleGuid))
+                                {
+                                    if (Vehicle* vehicle = vehicleCreature->GetVehicleKit())
+                                    {
+                                        vehicle->RemoveAllPassengers();
+                                        vehicleCreature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                                        vehicleCreature->DespawnOrUnsummon(5 * MINUTE * IN_MILLISECONDS);
+                                    }
+                                }
+                            }
+                            break;
+                        case EVENT_LEVIATHAN_BREAK_DOOR:
+                            if (Creature* Leviathan = instance->GetCreature(LeviathanGUID))
+                                Leviathan->AI()->DoAction(ACTION_MOVE_TO_CENTER_POSITION);
+                            if (GameObject* gameObject = instance->GetGameObject(LeviathanGateGUID))
+                                gameObject->SetGoState(GO_STATE_ACTIVE_ALTERNATIVE);
+                            break;
                     }
                 }
+            }
+
+            void UpdateDoorState(GameObject* door) override
+            {
+                // Leviathan doors are set to DOOR_TYPE_ROOM except the one it uses to enter the room
+                // which has to be set to DOOR_TYPE_PASSAGE
+                if (door->GetEntry() == GO_LEVIATHAN_DOOR && door->GetPositionX() > 400.f)
+                    door->SetGoState(GetBossState(BOSS_LEVIATHAN) == DONE ? GO_STATE_ACTIVE : GO_STATE_READY);
+                else
+                    InstanceScript::UpdateDoorState(door);
+            }
+
+            void AddDoor(GameObject* door, bool add) override
+            {
+                // Leviathan doors are South except the one it uses to enter the room
+                // which is North and should not be used for boundary checks in BossAI::CheckBoundary()
+                if (door->GetEntry() == GO_LEVIATHAN_DOOR && door->GetPositionX() > 400.f)
+                {
+                    if (add)
+                        GetBossInfo(BOSS_LEVIATHAN)->door[DOOR_TYPE_PASSAGE].insert(door->GetGUID());
+                    else
+                        GetBossInfo(BOSS_LEVIATHAN)->door[DOOR_TYPE_PASSAGE].erase(door->GetGUID());
+
+                    if (add)
+                        UpdateDoorState(door);
+                }
+                else
+                    InstanceScript::AddDoor(door, add);
             }
 
         private:
@@ -1073,6 +1240,7 @@ class instance_ulduar : public InstanceMapScript
             bool _summonYSKeeper[4];
             uint32 _maxArmorItemLevel;
             uint32 _maxWeaponItemLevel;
+            uint32 _CoUAchivePlayerDeathMask;
         };
 
         InstanceScript* GetInstanceScript(InstanceMap* map) const override

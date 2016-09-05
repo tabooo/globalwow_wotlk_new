@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -71,7 +71,9 @@ void WorldSession::HandleLfgJoinOpcode(WorldPacket& recvData)
     {
         uint32 dungeon;
         recvData >> dungeon;
-        newDungeons.insert((dungeon & 0x00FFFFFF));        // remove the type from the dungeon entry
+        dungeon &= 0x00FFFFFF;                             // remove the type from the dungeon entry
+        if (dungeon)
+            newDungeons.insert(dungeon);
     }
 
     recvData.read_skip<uint32>();                          // for 0..uint8 (always 3) { uint8 (always 0) }
@@ -123,8 +125,8 @@ void WorldSession::HandleLfgSetRolesOpcode(WorldPacket& recvData)
         return;
     }
     ObjectGuid gguid = group->GetGUID();
-    TC_LOG_DEBUG("lfg", "CMSG_LFG_SET_ROLES: Group %u, Player %s, Roles: %u",
-        gguid.GetCounter(), GetPlayerInfo().c_str(), roles);
+    TC_LOG_DEBUG("lfg", "CMSG_LFG_SET_ROLES: Group %s, Player %s, Roles: %u",
+        gguid.ToString().c_str(), GetPlayerInfo().c_str(), roles);
     sLFGMgr->UpdateRoleCheck(gguid, guid, roles);
 }
 
@@ -387,8 +389,8 @@ void WorldSession::SendLfgUpdateParty(const lfg::LfgUpdateData& updateData)
 
 void WorldSession::SendLfgRoleChosen(ObjectGuid guid, uint8 roles)
 {
-    TC_LOG_DEBUG("lfg", "SMSG_LFG_ROLE_CHOSEN %s guid: %u roles: %u",
-        GetPlayerInfo().c_str(), guid.GetCounter(), roles);
+    TC_LOG_DEBUG("lfg", "SMSG_LFG_ROLE_CHOSEN %s guid: %s roles: %u",
+        GetPlayerInfo().c_str(), guid.ToString().c_str(), roles);
 
     WorldPacket data(SMSG_LFG_ROLE_CHOSEN, 8 + 1 + 4);
     data << uint64(guid);                                  // Guid
@@ -424,7 +426,7 @@ void WorldSession::SendLfgRoleCheckUpdate(lfg::LfgRoleCheck const& roleCheck)
         data << uint64(guid);                              // Guid
         data << uint8(roles > 0);                          // Ready
         data << uint32(roles);                             // Roles
-        Player* player = ObjectAccessor::FindPlayer(guid);
+        Player* player = ObjectAccessor::FindConnectedPlayer(guid);
         data << uint8(player ? player->getLevel() : 0);    // Level
 
         for (lfg::LfgRolesMap::const_iterator it = roleCheck.roles.begin(); it != roleCheck.roles.end(); ++it)
@@ -437,7 +439,7 @@ void WorldSession::SendLfgRoleCheckUpdate(lfg::LfgRoleCheck const& roleCheck)
             data << uint64(guid);                          // Guid
             data << uint8(roles > 0);                      // Ready
             data << uint32(roles);                         // Roles
-            player = ObjectAccessor::FindPlayer(guid);
+            player = ObjectAccessor::FindConnectedPlayer(guid);
             data << uint8(player ? player->getLevel() : 0);// Level
         }
     }
@@ -463,10 +465,10 @@ void WorldSession::SendLfgJoinResult(lfg::LfgJoinResultData const& joinData)
 
 void WorldSession::SendLfgQueueStatus(lfg::LfgQueueStatusData const& queueData)
 {
-    TC_LOG_DEBUG("lfg", "SMSG_LFG_QUEUE_STATUS %s dungeon: %u, waitTime: %d, "
+    TC_LOG_DEBUG("lfg", "SMSG_LFG_QUEUE_STATUS %s state: %s, dungeon: %u, waitTime: %d, "
         "avgWaitTime: %d, waitTimeTanks: %d, waitTimeHealer: %d, waitTimeDps: %d, "
         "queuedTime: %u, tanks: %u, healers: %u, dps: %u",
-        GetPlayerInfo().c_str(), queueData.dungeonId, queueData.waitTime, queueData.waitTimeAvg,
+        GetPlayerInfo().c_str(), lfg::GetStateString(sLFGMgr->GetState(GetPlayer()->GetGUID())).c_str(), queueData.dungeonId, queueData.waitTime, queueData.waitTimeAvg,
         queueData.waitTimeTank, queueData.waitTimeHealer, queueData.waitTimeDps,
         queueData.queuedTime, queueData.tanks, queueData.healers, queueData.dps);
 
@@ -535,10 +537,10 @@ void WorldSession::SendLfgBootProposalUpdate(lfg::LfgPlayerBoot const& boot)
         }
     }
     TC_LOG_DEBUG("lfg", "SMSG_LFG_BOOT_PROPOSAL_UPDATE %s inProgress: %u - "
-        "didVote: %u - agree: %u - victim: %u votes: %u - agrees: %u - left: %u - "
+        "didVote: %u - agree: %u - victim: %s votes: %u - agrees: %u - left: %u - "
         "needed: %u - reason %s",
         GetPlayerInfo().c_str(), uint8(boot.inProgress), uint8(playerVote != lfg::LFG_ANSWER_PENDING),
-        uint8(playerVote == lfg::LFG_ANSWER_AGREE), boot.victim.GetCounter(), votesNum, agreeNum,
+        uint8(playerVote == lfg::LFG_ANSWER_AGREE), boot.victim.ToString().c_str(), votesNum, agreeNum,
         secsleft, lfg::LFG_GROUP_KICK_VOTES_NEEDED, boot.reason.c_str());
     WorldPacket data(SMSG_LFG_BOOT_PROPOSAL_UPDATE, 1 + 1 + 1 + 8 + 4 + 4 + 4 + 4 + boot.reason.length());
     data << uint8(boot.inProgress);                        // Vote in progress

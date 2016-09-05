@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -25,6 +25,8 @@
 #include "DBCEnums.h"
 #include "WorldPacket.h"
 #include "Object.h"
+#include "GameObject.h"
+#include "EventMap.h"
 
 class Creature;
 class GameObject;
@@ -37,6 +39,15 @@ class BattlegroundMap;
 
 struct PvPDifficultyEntry;
 struct WorldSafeLocsEntry;
+
+enum BattlegroundDesertionType
+{
+    BG_DESERTION_TYPE_LEAVE_BG        = 0, // player leaves the BG
+    BG_DESERTION_TYPE_OFFLINE         = 1, // player is kicked from BG because offline
+    BG_DESERTION_TYPE_LEAVE_QUEUE     = 2, // player is invited to join and refuses to do it
+    BG_DESERTION_TYPE_NO_ENTER_BUTTON = 3, // player is invited to join and do nothing (time expires)
+    BG_DESERTION_TYPE_INVITE_LOGOUT   = 4, // player is invited to join and logs out
+};
 
 enum BattlegroundCriteriaId
 {
@@ -210,7 +221,7 @@ This class is used to:
 3. some certain cases, same for all battlegrounds
 4. It has properties same for all battlegrounds
 */
-class Battleground
+class TC_GAME_API Battleground
 {
     public:
         Battleground();
@@ -430,10 +441,10 @@ class Battleground
         GuidVector BgObjects;
         GuidVector BgCreatures;
         void SpawnBGObject(uint32 type, uint32 respawntime);
-        virtual bool AddObject(uint32 type, uint32 entry, float x, float y, float z, float o, float rotation0, float rotation1, float rotation2, float rotation3, uint32 respawnTime = 0);
-        bool AddObject(uint32 type, uint32 entry, Position const& pos, float rotation0, float rotation1, float rotation2, float rotation3, uint32 respawnTime = 0);
-        virtual Creature* AddCreature(uint32 entry, uint32 type, float x, float y, float z, float o, TeamId teamId = TEAM_NEUTRAL, uint32 respawntime = 0);
-        Creature* AddCreature(uint32 entry, uint32 type, Position const& pos, TeamId teamId = TEAM_NEUTRAL, uint32 respawntime = 0);
+        virtual bool AddObject(uint32 type, uint32 entry, float x, float y, float z, float o, float rotation0, float rotation1, float rotation2, float rotation3, uint32 respawnTime = 0, GOState goState = GO_STATE_READY);
+        bool AddObject(uint32 type, uint32 entry, Position const& pos, float rotation0, float rotation1, float rotation2, float rotation3, uint32 respawnTime = 0, GOState goState = GO_STATE_READY);
+        virtual Creature* AddCreature(uint32 entry, uint32 type, float x, float y, float z, float o, TeamId teamId = TEAM_NEUTRAL, uint32 respawntime = 0, Transport* transport = NULL);
+        Creature* AddCreature(uint32 entry, uint32 type, Position const& pos, TeamId teamId = TEAM_NEUTRAL, uint32 respawntime = 0, Transport* transport = NULL);
         bool DelCreature(uint32 type);
         bool DelObject(uint32 type);
         virtual bool AddSpiritGuide(uint32 type, float x, float y, float z, float o, TeamId teamId = TEAM_NEUTRAL);

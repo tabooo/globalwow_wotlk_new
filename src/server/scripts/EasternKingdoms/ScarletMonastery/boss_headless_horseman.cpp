@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2006-2009 ScriptDev2 <https://scriptdev2.svn.sourceforge.net/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -95,12 +95,7 @@ enum Spells
     SPELL_DEATH                 = 42566       //not correct spell
 };
 
-struct Locations
-{
-    float x, y, z;
-};
-
-static Locations FlightPoint[]=
+G3D::Vector3 const FlightPoint[]=
 {
     {1754.00f, 1346.00f, 17.50f},
     {1765.00f, 1347.00f, 19.00f},
@@ -125,7 +120,7 @@ static Locations FlightPoint[]=
     {1758.00f, 1367.00f, 19.51f}
 };
 
-static Locations Spawn[]=
+G3D::Vector3 const Spawn[]=
 {
     {1776.27f, 1348.74f, 19.20f},       //spawn point for pumpkin shrine mob
     {1765.28f, 1347.46f, 17.55f}     //spawn point for smoke
@@ -138,8 +133,6 @@ static char const* Text[]=
     "You felt death once...",
     "Now, know demise!"
 };
-
-#define EMOTE_LAUGHS    "Headless Horseman laughs"  // needs assigned to db.
 
 class npc_wisp_invis : public CreatureScript
 {
@@ -352,7 +345,6 @@ public:
                     Creature* speaker = DoSpawnCreature(HELPER, 0, 0, 0, 0, TEMPSUMMON_TIMED_DESPAWN, 1000);
                     if (speaker)
                         speaker->CastSpell(speaker, SPELL_HEAD_SPEAKS, false);
-                    me->TextEmote(EMOTE_LAUGHS);
                 }
                 else laugh -= diff;
             }
@@ -364,8 +356,8 @@ public:
                     {
                         die = false;
                         if (Unit* body = ObjectAccessor::GetUnit(*me, bodyGUID))
-                            body->Kill(body);
-                        me->Kill(me);
+                            body->KillSelf();
+                        me->KillSelf();
                     }
                     else wait -= diff;
                 }
@@ -458,7 +450,7 @@ public:
             me->SetVisible(false);
             me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
             me->SetDisableGravity(true);
-            me->SetSpeed(MOVE_WALK, 5.0f, true);
+            me->SetSpeedRate(MOVE_WALK, 5.0f);
             wp_reached = false;
             count = 0;
             say_timer = 3000;
@@ -543,11 +535,7 @@ public:
 
         Player* SelectRandomPlayer(float range = 0.0f, bool checkLoS = true)
         {
-            Map* map = me->GetMap();
-            if (!map->IsDungeon())
-                return NULL;
-
-            Map::PlayerList const &PlayerList = map->GetPlayers();
+            Map::PlayerList const &PlayerList = me->GetMap()->GetPlayers();
             if (PlayerList.isEmpty())
                 return NULL;
 
@@ -733,7 +721,6 @@ public:
                 if (laugh <= diff)
                 {
                     laugh = urand(11000, 22000);
-                    me->TextEmote(EMOTE_LAUGHS);
                     DoPlaySoundToSet(me, RandomLaugh[rand32() % 3]);
                 }
                 else laugh -= diff;
@@ -882,34 +869,37 @@ public:
     };
 };
 
+enum LooselyTurnedSoil
+{
+    QUEST_CALL_THE_HEADLESS_HORSEMAN = 11405
+};
+
 class go_loosely_turned_soil : public GameObjectScript
 {
 public:
     go_loosely_turned_soil() : GameObjectScript("go_loosely_turned_soil") { }
 
-    bool OnGossipHello(Player* player, GameObject* soil) override
+    bool OnGossipHello(Player* player, GameObject* /*go*/) override
     {
-        InstanceScript* instance = player->GetInstanceScript();
-        if (instance)
-        {
-            if (instance->GetBossState(DATA_HORSEMAN_EVENT) != NOT_STARTED)
+        if (InstanceScript* instance = player->GetInstanceScript())
+            if (instance->GetBossState(DATA_HORSEMAN_EVENT) == IN_PROGRESS || player->GetQuestStatus(QUEST_CALL_THE_HEADLESS_HORSEMAN) != QUEST_STATUS_COMPLETE)
                 return true;
-            instance->SetBossState(DATA_HORSEMAN_EVENT, IN_PROGRESS);
-        }
-    /*  if (soil->GetGoType() == GAMEOBJECT_TYPE_QUESTGIVER && player->getLevel() > 64)
+
+        return false;
+    }
+
+    bool OnQuestReward(Player* player, GameObject* go, Quest const* /*quest*/, uint32 /*opt*/) override
+    {
+        if (InstanceScript* instance = go->GetInstanceScript())
+            if (instance->GetBossState(DATA_HORSEMAN_EVENT) == IN_PROGRESS)
+                return false;
+
+        player->AreaExploredOrEventHappens(11405);
+        if (Creature* horseman = go->SummonCreature(HH_MOUNTED, FlightPoint[20].x, FlightPoint[20].y, FlightPoint[20].z, 0, TEMPSUMMON_MANUAL_DESPAWN, 0))
         {
-            player->PrepareQuestMenu(soil->GetGUID());
-            player->SendPreparedQuest(soil->GetGUID());
+            ENSURE_AI(boss_headless_horseman::boss_headless_horsemanAI, horseman->AI())->PlayerGUID = player->GetGUID();
+            ENSURE_AI(boss_headless_horseman::boss_headless_horsemanAI, horseman->AI())->FlyMode();
         }
-        if (player->GetQuestStatus(11405) == QUEST_STATUS_INCOMPLETE && player->getLevel() > 64)
-        { */
-            player->AreaExploredOrEventHappens(11405);
-            if (Creature* horseman = soil->SummonCreature(HH_MOUNTED, FlightPoint[20].x, FlightPoint[20].y, FlightPoint[20].z, 0, TEMPSUMMON_MANUAL_DESPAWN, 0))
-            {
-                ENSURE_AI(boss_headless_horseman::boss_headless_horsemanAI, horseman->AI())->PlayerGUID = player->GetGUID();
-                ENSURE_AI(boss_headless_horseman::boss_headless_horsemanAI, horseman->AI())->FlyMode();
-            }
-        //}
         return true;
     }
 };

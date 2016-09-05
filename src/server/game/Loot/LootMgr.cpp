@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -95,7 +95,7 @@ class LootTemplate::LootGroup                               // A set of loot def
         void CheckLootRefs(LootTemplateMap const& store, LootIdSet* ref_set) const;
         LootStoreItemList* GetExplicitlyChancedItemList() { return &ExplicitlyChanced; }
         LootStoreItemList* GetEqualChancedItemList() { return &EqualChanced; }
-        void CopyConditions(ConditionList conditions);
+        void CopyConditions(ConditionContainer conditions);
     private:
         LootStoreItemList ExplicitlyChanced;                // Entries with chances defined in DB
         LootStoreItemList EqualChanced;                     // Zero chances - every entry takes the same chance
@@ -151,14 +151,8 @@ uint32 LootStore::LoadLootTable()
         bool   needsquest          = fields[4].GetBool();
         uint16 lootmode            = fields[5].GetUInt16();
         uint8  groupid             = fields[6].GetUInt8();
-        int32  mincount            = fields[7].GetUInt8();
-        int32  maxcount            = fields[8].GetUInt8();
-
-        if (maxcount > std::numeric_limits<uint8>::max())
-        {
-            TC_LOG_ERROR("sql.sql", "Table '%s' Entry %d Item %d: MaxCount value (%u) to large. must be less %u - skipped", GetName(), entry, item, maxcount, std::numeric_limits<uint8>::max());
-            continue;                                   // error already printed to log/console.
-        }
+        uint8  mincount            = fields[7].GetUInt8();
+        uint8  maxcount            = fields[8].GetUInt8();
 
         if (groupid >= 1 << 7)                                     // it stored in 7 bit field
         {
@@ -224,7 +218,7 @@ void LootStore::ResetConditions()
 {
     for (LootTemplateMap::iterator itr = m_LootTemplates.begin(); itr != m_LootTemplates.end(); ++itr)
     {
-        ConditionList empty;
+        ConditionContainer empty;
         itr->second->CopyConditions(empty);
     }
 }
@@ -272,9 +266,9 @@ void LootStore::ReportUnusedIds(LootIdSet const& lootIdSet) const
         TC_LOG_ERROR("sql.sql", "Table '%s' Entry %d isn't %s and not referenced from loot, and thus useless.", GetName(), *itr, GetEntryName());
 }
 
-void LootStore::ReportNonExistingId(uint32 id) const
+void LootStore::ReportNonExistingId(uint32 lootId, const char* ownerType, uint32 ownerId) const
 {
-    TC_LOG_ERROR("sql.sql", "Table '%s' Entry %d (%s) does not exist but is used as loot id in DB.", GetName(), id, GetEntryName());
+    TC_LOG_ERROR("sql.sql", "Table '%s' Entry %d does not exist but it is used by %s %d", GetName(), lootId, ownerType, ownerId);
 }
 
 //
@@ -359,7 +353,7 @@ LootItem::LootItem(LootStoreItem const& li)
     conditions   = li.conditions;
 
     ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemid);
-    freeforall  = proto && (proto->Flags & ITEM_PROTO_FLAG_PARTY_LOOT);
+    freeforall  = proto && (proto->Flags & ITEM_PROTO_FLAG_MULTI_DROP);
     follow_loot_rules = proto && (proto->FlagsCu & ITEM_FLAGS_CU_FOLLOW_LOOT_RULES);
 
     needs_quest = li.needs_quest;
@@ -405,7 +399,7 @@ bool LootItem::AllowedForPlayer(Player const* player) const
 
 void LootItem::AddAllowedLooter(const Player* player)
 {
-    allowedGUIDs.insert(player->GetGUIDLow());
+    allowedGUIDs.insert(player->GetGUID().GetCounter());
 }
 
 //
@@ -435,7 +429,7 @@ void Loot::AddItem(LootStoreItem const& item)
         // non-conditional one-player only items are counted here,
         // free for all items are counted in FillFFALoot(),
         // non-ffa conditionals are counted in FillNonQuestNonFFAConditionalLoot()
-        if (!item.needs_quest && item.conditions.empty() && !(proto->Flags & ITEM_PROTO_FLAG_PARTY_LOOT))
+        if (!item.needs_quest && item.conditions.empty() && !(proto->Flags & ITEM_PROTO_FLAG_MULTI_DROP))
             ++unlootedCount;
     }
 }
@@ -487,7 +481,7 @@ bool Loot::FillLoot(uint32 lootId, LootStore const& store, Player* lootOwner, bo
 
 void Loot::FillNotNormalLootFor(Player* player, bool presentAtLooting)
 {
-    uint32 plguid = player->GetGUIDLow();
+    ObjectGuid::LowType plguid = player->GetGUID().GetCounter();
 
     QuestItemMap::const_iterator qmapitr = PlayerQuestItems.find(plguid);
     if (qmapitr == PlayerQuestItems.end())
@@ -542,7 +536,7 @@ QuestItemList* Loot::FillFFALoot(Player* player)
         return NULL;
     }
 
-    PlayerFFAItems[player->GetGUIDLow()] = ql;
+    PlayerFFAItems[player->GetGUID().GetCounter()] = ql;
     return ql;
 }
 
@@ -580,7 +574,7 @@ QuestItemList* Loot::FillQuestLoot(Player* player)
         return NULL;
     }
 
-    PlayerQuestItems[player->GetGUIDLow()] = ql;
+    PlayerQuestItems[player->GetGUID().GetCounter()] = ql;
     return ql;
 }
 
@@ -612,7 +606,7 @@ QuestItemList* Loot::FillNonQuestNonFFAConditionalLoot(Player* player, bool pres
         return NULL;
     }
 
-    PlayerNonQuestNonFFAConditionalItems[player->GetGUIDLow()] = ql;
+    PlayerNonQuestNonFFAConditionalItems[player->GetGUID().GetCounter()] = ql;
     return ql;
 }
 
@@ -663,7 +657,7 @@ void Loot::NotifyQuestItemRemoved(uint8 questIndex)
         ++i_next;
         if (Player* player = ObjectAccessor::FindPlayer(*i))
         {
-            QuestItemMap::const_iterator pq = PlayerQuestItems.find(player->GetGUIDLow());
+            QuestItemMap::const_iterator pq = PlayerQuestItems.find(player->GetGUID().GetCounter());
             if (pq != PlayerQuestItems.end() && pq->second)
             {
                 // find where/if the player has the given item in it's vector
@@ -710,7 +704,7 @@ void Loot::DeleteLootItemFromContainerItemDB(uint32 itemID)
         if (_itr->itemid != itemID)
             continue;
 
-        _itr->canSave = true;
+        _itr->canSave = false;
         break;
     }
 }
@@ -730,7 +724,7 @@ LootItem* Loot::LootItemInSlot(uint32 lootSlot, Player* player, QuestItem* *qite
     if (lootSlot >= items.size())
     {
         uint32 questSlot = lootSlot - items.size();
-        QuestItemMap::const_iterator itr = PlayerQuestItems.find(player->GetGUIDLow());
+        QuestItemMap::const_iterator itr = PlayerQuestItems.find(player->GetGUID().GetCounter());
         if (itr != PlayerQuestItems.end() && questSlot < itr->second->size())
         {
             QuestItem* qitem2 = &itr->second->at(questSlot);
@@ -746,7 +740,7 @@ LootItem* Loot::LootItemInSlot(uint32 lootSlot, Player* player, QuestItem* *qite
         is_looted = item->is_looted;
         if (item->freeforall)
         {
-            QuestItemMap::const_iterator itr = PlayerFFAItems.find(player->GetGUIDLow());
+            QuestItemMap::const_iterator itr = PlayerFFAItems.find(player->GetGUID().GetCounter());
             if (itr != PlayerFFAItems.end())
             {
                 for (QuestItemList::const_iterator iter=itr->second->begin(); iter!= itr->second->end(); ++iter)
@@ -762,7 +756,7 @@ LootItem* Loot::LootItemInSlot(uint32 lootSlot, Player* player, QuestItem* *qite
         }
         else if (!item->conditions.empty())
         {
-            QuestItemMap::const_iterator itr = PlayerNonQuestNonFFAConditionalItems.find(player->GetGUIDLow());
+            QuestItemMap::const_iterator itr = PlayerNonQuestNonFFAConditionalItems.find(player->GetGUID().GetCounter());
             if (itr != PlayerNonQuestNonFFAConditionalItems.end())
             {
                 for (QuestItemList::const_iterator iter=itr->second->begin(); iter!= itr->second->end(); ++iter)
@@ -788,15 +782,28 @@ LootItem* Loot::LootItemInSlot(uint32 lootSlot, Player* player, QuestItem* *qite
 
 uint32 Loot::GetMaxSlotInLootFor(Player* player) const
 {
-    QuestItemMap::const_iterator itr = PlayerQuestItems.find(player->GetGUIDLow());
+    QuestItemMap::const_iterator itr = PlayerQuestItems.find(player->GetGUID().GetCounter());
     return items.size() + (itr != PlayerQuestItems.end() ?  itr->second->size() : 0);
+}
+
+// return true if there is any item that is lootable for any player (not quest item, FFA or conditional)
+bool Loot::hasItemForAll() const
+{
+    // Gold is always lootable
+    if (gold)
+        return true;
+
+    for (LootItem const& item : items)
+        if (!item.is_looted && !item.freeforall && item.conditions.empty())
+            return true;
+    return false;
 }
 
 // return true if there is any FFA, quest or conditional item for the player.
 bool Loot::hasItemFor(Player* player) const
 {
     QuestItemMap const& lootPlayerQuestItems = GetPlayerQuestItems();
-    QuestItemMap::const_iterator q_itr = lootPlayerQuestItems.find(player->GetGUIDLow());
+    QuestItemMap::const_iterator q_itr = lootPlayerQuestItems.find(player->GetGUID().GetCounter());
     if (q_itr != lootPlayerQuestItems.end())
     {
         QuestItemList* q_list = q_itr->second;
@@ -809,7 +816,7 @@ bool Loot::hasItemFor(Player* player) const
     }
 
     QuestItemMap const& lootPlayerFFAItems = GetPlayerFFAItems();
-    QuestItemMap::const_iterator ffa_itr = lootPlayerFFAItems.find(player->GetGUIDLow());
+    QuestItemMap::const_iterator ffa_itr = lootPlayerFFAItems.find(player->GetGUID().GetCounter());
     if (ffa_itr != lootPlayerFFAItems.end())
     {
         QuestItemList* ffa_list = ffa_itr->second;
@@ -822,7 +829,7 @@ bool Loot::hasItemFor(Player* player) const
     }
 
     QuestItemMap const& lootPlayerNonQuestNonFFAConditionalItems = GetPlayerNonQuestNonFFAConditionalItems();
-    QuestItemMap::const_iterator nn_itr = lootPlayerNonQuestNonFFAConditionalItems.find(player->GetGUIDLow());
+    QuestItemMap::const_iterator nn_itr = lootPlayerNonQuestNonFFAConditionalItems.find(player->GetGUID().GetCounter());
     if (nn_itr != lootPlayerNonQuestNonFFAConditionalItems.end())
     {
         QuestItemList* conditional_list = nn_itr->second;
@@ -853,7 +860,7 @@ ByteBuffer& operator<<(ByteBuffer& b, LootItem const& li)
 {
     b << uint32(li.itemid);
     b << uint32(li.count);                                  // nr of items of this type
-    b << uint32(sObjectMgr->GetItemTemplate(li.itemid)->DisplayInfoID);
+    b << uint32(ASSERT_NOTNULL(sObjectMgr->GetItemTemplate(li.itemid))->DisplayInfoID);
     b << uint32(li.randomSuffix);
     b << uint32(li.randomPropertyId);
     //b << uint8(0);                                        // slot type - will send after this function call
@@ -970,7 +977,7 @@ ByteBuffer& operator<<(ByteBuffer& b, LootView const& lv)
 
     LootSlotType slotType = lv.permission == OWNER_PERMISSION ? LOOT_SLOT_TYPE_OWNER : LOOT_SLOT_TYPE_ALLOW_LOOT;
     QuestItemMap const& lootPlayerQuestItems = l.GetPlayerQuestItems();
-    QuestItemMap::const_iterator q_itr = lootPlayerQuestItems.find(lv.viewer->GetGUIDLow());
+    QuestItemMap::const_iterator q_itr = lootPlayerQuestItems.find(lv.viewer->GetGUID().GetCounter());
     if (q_itr != lootPlayerQuestItems.end())
     {
         QuestItemList* q_list = q_itr->second;
@@ -1011,7 +1018,7 @@ ByteBuffer& operator<<(ByteBuffer& b, LootView const& lv)
     }
 
     QuestItemMap const& lootPlayerFFAItems = l.GetPlayerFFAItems();
-    QuestItemMap::const_iterator ffa_itr = lootPlayerFFAItems.find(lv.viewer->GetGUIDLow());
+    QuestItemMap::const_iterator ffa_itr = lootPlayerFFAItems.find(lv.viewer->GetGUID().GetCounter());
     if (ffa_itr != lootPlayerFFAItems.end())
     {
         QuestItemList* ffa_list = ffa_itr->second;
@@ -1029,7 +1036,7 @@ ByteBuffer& operator<<(ByteBuffer& b, LootView const& lv)
     }
 
     QuestItemMap const& lootPlayerNonQuestNonFFAConditionalItems = l.GetPlayerNonQuestNonFFAConditionalItems();
-    QuestItemMap::const_iterator nn_itr = lootPlayerNonQuestNonFFAConditionalItems.find(lv.viewer->GetGUIDLow());
+    QuestItemMap::const_iterator nn_itr = lootPlayerNonQuestNonFFAConditionalItems.find(lv.viewer->GetGUID().GetCounter());
     if (nn_itr != lootPlayerNonQuestNonFFAConditionalItems.end())
     {
         QuestItemList* conditional_list = nn_itr->second;
@@ -1161,7 +1168,7 @@ bool LootTemplate::LootGroup::HasQuestDropForPlayer(Player const* player) const
     return false;
 }
 
-void LootTemplate::LootGroup::CopyConditions(ConditionList /*conditions*/)
+void LootTemplate::LootGroup::CopyConditions(ConditionContainer /*conditions*/)
 {
     for (LootStoreItemList::iterator i = ExplicitlyChanced.begin(); i != ExplicitlyChanced.end(); ++i)
         (*i)->conditions.clear();
@@ -1218,7 +1225,7 @@ void LootTemplate::LootGroup::CheckLootRefs(LootTemplateMap const& /*store*/, Lo
         if (item->reference > 0)
         {
             if (!LootTemplates_Reference.GetLootFor(item->reference))
-                LootTemplates_Reference.ReportNonExistingId(item->reference);
+                LootTemplates_Reference.ReportNonExistingId(item->reference, "Reference", item->itemid);
             else if (ref_set)
                 ref_set->erase(item->reference);
         }
@@ -1230,7 +1237,7 @@ void LootTemplate::LootGroup::CheckLootRefs(LootTemplateMap const& /*store*/, Lo
         if (item->reference > 0)
         {
             if (!LootTemplates_Reference.GetLootFor(item->reference))
-                LootTemplates_Reference.ReportNonExistingId(item->reference);
+                LootTemplates_Reference.ReportNonExistingId(item->reference, "Reference", item->itemid);
             else if (ref_set)
                 ref_set->erase(item->reference);
         }
@@ -1266,7 +1273,7 @@ void LootTemplate::AddEntry(LootStoreItem* item)
         Entries.push_back(item);
 }
 
-void LootTemplate::CopyConditions(const ConditionList& conditions)
+void LootTemplate::CopyConditions(const ConditionContainer& conditions)
 {
     for (LootStoreItemList::iterator i = Entries.begin(); i != Entries.end(); ++i)
         (*i)->conditions.clear();
@@ -1431,7 +1438,7 @@ void LootTemplate::CheckLootRefs(LootTemplateMap const& store, LootIdSet* ref_se
         if (item->reference > 0)
         {
             if (!LootTemplates_Reference.GetLootFor(item->reference))
-                LootTemplates_Reference.ReportNonExistingId(item->reference);
+                LootTemplates_Reference.ReportNonExistingId(item->reference, "Reference", item->itemid);
             else if (ref_set)
                 ref_set->erase(item->reference);
         }
@@ -1525,7 +1532,7 @@ void LoadLootTemplates_Creature()
         if (uint32 lootid = itr->second.lootid)
         {
             if (lootIdSet.find(lootid) == lootIdSet.end())
-                LootTemplates_Creature.ReportNonExistingId(lootid);
+                LootTemplates_Creature.ReportNonExistingId(lootid, "Creature", itr->second.Entry);
             else
                 lootIdSetUsed.insert(lootid);
         }
@@ -1558,7 +1565,7 @@ void LoadLootTemplates_Disenchant()
         if (uint32 lootid = itr->second.DisenchantID)
         {
             if (lootIdSet.find(lootid) == lootIdSet.end())
-                LootTemplates_Disenchant.ReportNonExistingId(lootid);
+                LootTemplates_Disenchant.ReportNonExistingId(lootid, "Item", itr->second.ItemId);
             else
                 lootIdSetUsed.insert(lootid);
         }
@@ -1586,8 +1593,8 @@ void LoadLootTemplates_Fishing()
     uint32 count = LootTemplates_Fishing.LoadAndCollectLootIds(lootIdSet);
 
     // remove real entries and check existence loot
-    for (uint32 i = 1; i < sAreaStore.GetNumRows(); ++i)
-        if (AreaTableEntry const* areaEntry = sAreaStore.LookupEntry(i))
+    for (uint32 i = 1; i < sAreaTableStore.GetNumRows(); ++i)
+        if (AreaTableEntry const* areaEntry = sAreaTableStore.LookupEntry(i))
             if (lootIdSet.find(areaEntry->ID) != lootIdSet.end())
                 lootIdSet.erase(areaEntry->ID);
 
@@ -1616,7 +1623,7 @@ void LoadLootTemplates_Gameobject()
         if (uint32 lootid = itr->second.GetLootId())
         {
             if (lootIdSet.find(lootid) == lootIdSet.end())
-                LootTemplates_Gameobject.ReportNonExistingId(lootid);
+                LootTemplates_Gameobject.ReportNonExistingId(lootid, "Gameobject", itr->second.entry);
             else
                 lootIdSetUsed.insert(lootid);
         }
@@ -1646,7 +1653,7 @@ void LoadLootTemplates_Item()
     // remove real entries and check existence loot
     ItemTemplateContainer const* its = sObjectMgr->GetItemTemplateStore();
     for (ItemTemplateContainer::const_iterator itr = its->begin(); itr != its->end(); ++itr)
-        if (lootIdSet.find(itr->second.ItemId) != lootIdSet.end() && itr->second.Flags & ITEM_PROTO_FLAG_OPENABLE)
+        if (lootIdSet.find(itr->second.ItemId) != lootIdSet.end() && itr->second.Flags & ITEM_PROTO_FLAG_HAS_LOOT)
             lootIdSet.erase(itr->second.ItemId);
 
     // output error for any still listed (not referenced from appropriate table) ids
@@ -1703,7 +1710,7 @@ void LoadLootTemplates_Pickpocketing()
         if (uint32 lootid = itr->second.pickpocketLootId)
         {
             if (lootIdSet.find(lootid) == lootIdSet.end())
-                LootTemplates_Pickpocketing.ReportNonExistingId(lootid);
+                LootTemplates_Pickpocketing.ReportNonExistingId(lootid, "Creature", itr->second.Entry);
             else
                 lootIdSetUsed.insert(lootid);
         }
@@ -1790,7 +1797,7 @@ void LoadLootTemplates_Skinning()
         if (uint32 lootid = itr->second.SkinLootId)
         {
             if (lootIdSet.find(lootid) == lootIdSet.end())
-                LootTemplates_Skinning.ReportNonExistingId(lootid);
+                LootTemplates_Skinning.ReportNonExistingId(lootid, "Creature", itr->second.Entry);
             else
                 lootIdSetUsed.insert(lootid);
         }
@@ -1832,9 +1839,9 @@ void LoadLootTemplates_Spell()
         {
             // not report about not trainable spells (optionally supported by DB)
             // ignore 61756 (Northrend Inscription Research (FAST QA VERSION) for example
-            if (!(spellInfo->Attributes & SPELL_ATTR0_NOT_SHAPESHIFT) || (spellInfo->Attributes & SPELL_ATTR0_TRADESPELL))
+            if (!spellInfo->HasAttribute(SPELL_ATTR0_NOT_SHAPESHIFT) || spellInfo->HasAttribute(SPELL_ATTR0_TRADESPELL))
             {
-                LootTemplates_Spell.ReportNonExistingId(spell_id);
+                LootTemplates_Spell.ReportNonExistingId(spell_id, "Spell", spellInfo->Id);
             }
         }
         else
@@ -1876,4 +1883,21 @@ void LoadLootTemplates_Reference()
     LootTemplates_Reference.ReportUnusedIds(lootIdSet);
 
     TC_LOG_INFO("server.loading", ">> Loaded refence loot templates in %u ms", GetMSTimeDiffToNow(oldMSTime));
+}
+
+void LoadLootTables()
+{
+    LoadLootTemplates_Creature();
+    LoadLootTemplates_Fishing();
+    LoadLootTemplates_Gameobject();
+    LoadLootTemplates_Item();
+    LoadLootTemplates_Mail();
+    LoadLootTemplates_Milling();
+    LoadLootTemplates_Pickpocketing();
+    LoadLootTemplates_Skinning();
+    LoadLootTemplates_Disenchant();
+    LoadLootTemplates_Prospecting();
+    LoadLootTemplates_Spell();
+
+    LoadLootTemplates_Reference();
 }

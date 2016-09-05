@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 5.6.9-rc, for Win64 (x86_64)
+-- MySQL dump 10.13  Distrib 5.6.26, for Win64 (x86_64)
 --
 -- Host: localhost    Database: characters
 -- ------------------------------------------------------
--- Server version	5.6.9-rc
+-- Server version	5.6.26-log
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -190,7 +190,7 @@ DROP TABLE IF EXISTS `auctionhouse`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `auctionhouse` (
   `id` int(10) unsigned NOT NULL DEFAULT '0',
-  `auctioneerguid` int(10) unsigned NOT NULL DEFAULT '0',
+  `houseid` tinyint(3) unsigned NOT NULL DEFAULT '7',
   `itemguid` int(10) unsigned NOT NULL DEFAULT '0',
   `itemowner` int(10) unsigned NOT NULL DEFAULT '0',
   `buyoutprice` int(10) unsigned NOT NULL DEFAULT '0',
@@ -237,6 +237,29 @@ CREATE TABLE `banned_addons` (
 LOCK TABLES `banned_addons` WRITE;
 /*!40000 ALTER TABLE `banned_addons` DISABLE KEYS */;
 /*!40000 ALTER TABLE `banned_addons` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `battleground_deserters`
+--
+
+DROP TABLE IF EXISTS `battleground_deserters`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `battleground_deserters` (
+  `guid` int(10) unsigned NOT NULL COMMENT 'characters.guid',
+  `type` tinyint(3) unsigned NOT NULL COMMENT 'type of the desertion',
+  `datetime` datetime NOT NULL COMMENT 'datetime of the desertion'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `battleground_deserters`
+--
+
+LOCK TABLES `battleground_deserters` WRITE;
+/*!40000 ALTER TABLE `battleground_deserters` DISABLE KEYS */;
+/*!40000 ALTER TABLE `battleground_deserters` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -483,22 +506,22 @@ DROP TABLE IF EXISTS `character_aura`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `character_aura` (
   `guid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Global Unique Identifier',
-  `caster_guid` bigint(20) unsigned NOT NULL DEFAULT '0' COMMENT 'Full Global Unique Identifier',
-  `item_guid` bigint(20) unsigned NOT NULL DEFAULT '0',
+  `casterGuid` bigint(20) unsigned NOT NULL DEFAULT '0' COMMENT 'Full Global Unique Identifier',
+  `itemGuid` bigint(20) unsigned NOT NULL DEFAULT '0',
   `spell` mediumint(8) unsigned NOT NULL DEFAULT '0',
-  `effect_mask` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  `recalculate_mask` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  `stackcount` tinyint(3) unsigned NOT NULL DEFAULT '1',
+  `effectMask` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `recalculateMask` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `stackCount` tinyint(3) unsigned NOT NULL DEFAULT '1',
   `amount0` int(11) NOT NULL DEFAULT '0',
   `amount1` int(11) NOT NULL DEFAULT '0',
   `amount2` int(11) NOT NULL DEFAULT '0',
   `base_amount0` int(11) NOT NULL DEFAULT '0',
   `base_amount1` int(11) NOT NULL DEFAULT '0',
   `base_amount2` int(11) NOT NULL DEFAULT '0',
-  `maxduration` int(11) NOT NULL DEFAULT '0',
-  `remaintime` int(11) NOT NULL DEFAULT '0',
-  `remaincharges` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`guid`,`caster_guid`,`item_guid`,`spell`,`effect_mask`)
+  `maxDuration` int(11) NOT NULL DEFAULT '0',
+  `remainTime` int(11) NOT NULL DEFAULT '0',
+  `remainCharges` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`guid`,`casterGuid`,`itemGuid`,`spell`,`effectMask`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Player System';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -702,14 +725,14 @@ DROP TABLE IF EXISTS `character_glyphs`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `character_glyphs` (
   `guid` int(10) unsigned NOT NULL,
-  `spec` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `talentGroup` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `glyph1` smallint(5) unsigned DEFAULT '0',
   `glyph2` smallint(5) unsigned DEFAULT '0',
   `glyph3` smallint(5) unsigned DEFAULT '0',
   `glyph4` smallint(5) unsigned DEFAULT '0',
   `glyph5` smallint(5) unsigned DEFAULT '0',
   `glyph6` smallint(5) unsigned DEFAULT '0',
-  PRIMARY KEY (`guid`,`spec`)
+  PRIMARY KEY (`guid`,`talentGroup`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -760,6 +783,7 @@ CREATE TABLE `character_instance` (
   `guid` int(10) unsigned NOT NULL DEFAULT '0',
   `instance` int(10) unsigned NOT NULL DEFAULT '0',
   `permanent` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `extendState` tinyint(2) unsigned NOT NULL DEFAULT '1',
   PRIMARY KEY (`guid`,`instance`),
   KEY `instance` (`instance`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -1140,6 +1164,8 @@ CREATE TABLE `character_spell_cooldown` (
   `spell` mediumint(8) unsigned NOT NULL DEFAULT '0' COMMENT 'Spell Identifier',
   `item` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Item Identifier',
   `time` int(10) unsigned NOT NULL DEFAULT '0',
+  `categoryId` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Spell category Id',
+  `categoryEnd` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`guid`,`spell`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1215,8 +1241,8 @@ DROP TABLE IF EXISTS `character_talent`;
 CREATE TABLE `character_talent` (
   `guid` int(10) unsigned NOT NULL,
   `spell` mediumint(8) unsigned NOT NULL,
-  `spec` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`guid`,`spell`,`spec`)
+  `talentGroup` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`guid`,`spell`,`talentGroup`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1246,8 +1272,13 @@ CREATE TABLE `characters` (
   `level` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `xp` int(10) unsigned NOT NULL DEFAULT '0',
   `money` int(10) unsigned NOT NULL DEFAULT '0',
-  `playerBytes` int(10) unsigned NOT NULL DEFAULT '0',
-  `playerBytes2` int(10) unsigned NOT NULL DEFAULT '0',
+  `skin` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `face` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `hairStyle` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `hairColor` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `facialStyle` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `bankSlots` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `restState` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `playerFlags` int(10) unsigned NOT NULL DEFAULT '0',
   `position_x` float NOT NULL DEFAULT '0',
   `position_y` float NOT NULL DEFAULT '0',
@@ -1297,8 +1328,8 @@ CREATE TABLE `characters` (
   `power6` int(10) unsigned NOT NULL DEFAULT '0',
   `power7` int(10) unsigned NOT NULL DEFAULT '0',
   `latency` mediumint(8) unsigned NOT NULL DEFAULT '0',
-  `speccount` tinyint(3) unsigned NOT NULL DEFAULT '1',
-  `activespec` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `talentGroupsCount` tinyint(3) unsigned NOT NULL DEFAULT '1',
+  `activeTalentGroup` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `exploredZones` longtext,
   `equipmentCache` longtext,
   `ammoId` int(10) unsigned NOT NULL DEFAULT '0',
@@ -1332,7 +1363,6 @@ DROP TABLE IF EXISTS `corpse`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `corpse` (
-  `corpseGuid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Global Unique Identifier',
   `guid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Character Global Unique Identifier',
   `posX` float NOT NULL DEFAULT '0',
   `posY` float NOT NULL DEFAULT '0',
@@ -1350,10 +1380,9 @@ CREATE TABLE `corpse` (
   `time` int(10) unsigned NOT NULL DEFAULT '0',
   `corpseType` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `instanceId` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Instance Identifier',
-  PRIMARY KEY (`corpseGuid`),
+  PRIMARY KEY (`guid`),
   KEY `idx_type` (`corpseType`),
   KEY `idx_instance` (`instanceId`),
-  KEY `idx_player` (`guid`),
   KEY `idx_time` (`time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Death System';
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1468,68 +1497,69 @@ LOCK TABLES `gameobject_respawn` WRITE;
 UNLOCK TABLES;
 
 --
--- Table structure for table `gm_subsurveys`
+-- Table structure for table `gm_subsurvey`
 --
 
-DROP TABLE IF EXISTS `gm_subsurveys`;
+DROP TABLE IF EXISTS `gm_subsurvey`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `gm_subsurveys` (
+CREATE TABLE `gm_subsurvey` (
   `surveyId` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `subsurveyId` int(10) unsigned NOT NULL DEFAULT '0',
-  `rank` int(10) unsigned NOT NULL DEFAULT '0',
-  `comment` text NOT NULL,
-  PRIMARY KEY (`surveyId`,`subsurveyId`)
+  `questionId` int(10) unsigned NOT NULL DEFAULT '0',
+  `answer` int(10) unsigned NOT NULL DEFAULT '0',
+  `answerComment` text NOT NULL,
+  PRIMARY KEY (`surveyId`,`questionId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Player System';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `gm_subsurveys`
+-- Dumping data for table `gm_subsurvey`
 --
 
-LOCK TABLES `gm_subsurveys` WRITE;
-/*!40000 ALTER TABLE `gm_subsurveys` DISABLE KEYS */;
-/*!40000 ALTER TABLE `gm_subsurveys` ENABLE KEYS */;
+LOCK TABLES `gm_subsurvey` WRITE;
+/*!40000 ALTER TABLE `gm_subsurvey` DISABLE KEYS */;
+/*!40000 ALTER TABLE `gm_subsurvey` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
--- Table structure for table `gm_surveys`
+-- Table structure for table `gm_survey`
 --
 
-DROP TABLE IF EXISTS `gm_surveys`;
+DROP TABLE IF EXISTS `gm_survey`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `gm_surveys` (
+CREATE TABLE `gm_survey` (
   `surveyId` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `guid` int(10) unsigned NOT NULL DEFAULT '0',
   `mainSurvey` int(10) unsigned NOT NULL DEFAULT '0',
-  `overallComment` longtext NOT NULL,
+  `comment` longtext NOT NULL,
   `createTime` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`surveyId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Player System';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `gm_surveys`
+-- Dumping data for table `gm_survey`
 --
 
-LOCK TABLES `gm_surveys` WRITE;
-/*!40000 ALTER TABLE `gm_surveys` DISABLE KEYS */;
-/*!40000 ALTER TABLE `gm_surveys` ENABLE KEYS */;
+LOCK TABLES `gm_survey` WRITE;
+/*!40000 ALTER TABLE `gm_survey` DISABLE KEYS */;
+/*!40000 ALTER TABLE `gm_survey` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
--- Table structure for table `gm_tickets`
+-- Table structure for table `gm_ticket`
 --
 
-DROP TABLE IF EXISTS `gm_tickets`;
+DROP TABLE IF EXISTS `gm_ticket`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `gm_tickets` (
-  `ticketId` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `guid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Global Unique Identifier of ticket creator',
+CREATE TABLE `gm_ticket` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `type` tinyint(3) unsigned NOT NULL DEFAULT '0' COMMENT '0 open, 1 closed, 2 character deleted',
+  `playerGuid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Global Unique Identifier of ticket creator',
   `name` varchar(12) NOT NULL COMMENT 'Name of ticket creator',
-  `message` text NOT NULL,
+  `description` text NOT NULL,
   `createTime` int(10) unsigned NOT NULL DEFAULT '0',
   `mapId` smallint(5) unsigned NOT NULL DEFAULT '0',
   `posX` float NOT NULL DEFAULT '0',
@@ -1543,18 +1573,19 @@ CREATE TABLE `gm_tickets` (
   `completed` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `escalated` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `viewed` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  `haveTicket` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`ticketId`)
+  `needMoreHelp` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `resolvedBy` int(10) NOT NULL DEFAULT '0' COMMENT 'GUID of GM who resolved the ticket',
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Player System';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `gm_tickets`
+-- Dumping data for table `gm_ticket`
 --
 
-LOCK TABLES `gm_tickets` WRITE;
-/*!40000 ALTER TABLE `gm_tickets` DISABLE KEYS */;
-/*!40000 ALTER TABLE `gm_tickets` ENABLE KEYS */;
+LOCK TABLES `gm_ticket` WRITE;
+/*!40000 ALTER TABLE `gm_ticket` DISABLE KEYS */;
+/*!40000 ALTER TABLE `gm_ticket` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -1631,7 +1662,7 @@ CREATE TABLE `groups` (
   `icon8` bigint(20) unsigned NOT NULL,
   `groupType` tinyint(3) unsigned NOT NULL,
   `difficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  `raiddifficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `raidDifficulty` tinyint(3) unsigned NOT NULL DEFAULT '0',
   `masterLooterGuid` int(10) unsigned NOT NULL,
   PRIMARY KEY (`guid`),
   KEY `leaderGuid` (`leaderGuid`)
@@ -2226,21 +2257,21 @@ DROP TABLE IF EXISTS `pet_aura`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `pet_aura` (
   `guid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Global Unique Identifier',
-  `caster_guid` bigint(20) unsigned NOT NULL DEFAULT '0' COMMENT 'Full Global Unique Identifier',
+  `casterGuid` bigint(20) unsigned NOT NULL DEFAULT '0' COMMENT 'Full Global Unique Identifier',
   `spell` mediumint(8) unsigned NOT NULL DEFAULT '0',
-  `effect_mask` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  `recalculate_mask` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  `stackcount` tinyint(3) unsigned NOT NULL DEFAULT '1',
+  `effectMask` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `recalculateMask` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  `stackCount` tinyint(3) unsigned NOT NULL DEFAULT '1',
   `amount0` mediumint(8) NOT NULL,
   `amount1` mediumint(8) NOT NULL,
   `amount2` mediumint(8) NOT NULL,
   `base_amount0` mediumint(8) NOT NULL,
   `base_amount1` mediumint(8) NOT NULL,
   `base_amount2` mediumint(8) NOT NULL,
-  `maxduration` int(11) NOT NULL DEFAULT '0',
-  `remaintime` int(11) NOT NULL DEFAULT '0',
-  `remaincharges` tinyint(3) unsigned NOT NULL DEFAULT '0',
-  PRIMARY KEY (`guid`,`spell`,`effect_mask`)
+  `maxDuration` int(11) NOT NULL DEFAULT '0',
+  `remainTime` int(11) NOT NULL DEFAULT '0',
+  `remainCharges` tinyint(3) unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`guid`,`casterGuid`,`spell`,`effectMask`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Pet System';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2288,6 +2319,8 @@ CREATE TABLE `pet_spell_cooldown` (
   `guid` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Global Unique Identifier, Low part',
   `spell` mediumint(8) unsigned NOT NULL DEFAULT '0' COMMENT 'Spell Identifier',
   `time` int(10) unsigned NOT NULL DEFAULT '0',
+  `categoryId` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'Spell category Id',
+  `categoryEnd` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`guid`,`spell`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -2414,6 +2447,7 @@ DROP TABLE IF EXISTS `pvpstats_players`;
 CREATE TABLE `pvpstats_players` (
   `battleground_id` bigint(20) unsigned NOT NULL,
   `character_guid` int(10) unsigned NOT NULL,
+  `winner` bit(1) NOT NULL,
   `score_killing_blows` mediumint(8) unsigned NOT NULL,
   `score_deaths` mediumint(8) unsigned NOT NULL,
   `score_honorable_kills` mediumint(8) unsigned NOT NULL,
@@ -2439,6 +2473,34 @@ LOCK TABLES `pvpstats_players` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `quest_tracker`
+--
+
+DROP TABLE IF EXISTS `quest_tracker`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `quest_tracker` (
+  `id` mediumint(8) unsigned NOT NULL DEFAULT '0',
+  `character_guid` int(10) unsigned NOT NULL DEFAULT '0',
+  `quest_accept_time` datetime NOT NULL,
+  `quest_complete_time` datetime DEFAULT NULL,
+  `quest_abandon_time` datetime DEFAULT NULL,
+  `completed_by_gm` tinyint(1) NOT NULL DEFAULT '0',
+  `core_hash` varchar(120) NOT NULL DEFAULT '0',
+  `core_revision` varchar(120) NOT NULL DEFAULT '0'
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `quest_tracker`
+--
+
+LOCK TABLES `quest_tracker` WRITE;
+/*!40000 ALTER TABLE `quest_tracker` DISABLE KEYS */;
+/*!40000 ALTER TABLE `quest_tracker` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `reserved_name`
 --
 
@@ -2458,6 +2520,57 @@ CREATE TABLE `reserved_name` (
 LOCK TABLES `reserved_name` WRITE;
 /*!40000 ALTER TABLE `reserved_name` DISABLE KEYS */;
 /*!40000 ALTER TABLE `reserved_name` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `updates`
+--
+
+DROP TABLE IF EXISTS `updates`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `updates` (
+  `name` varchar(200) NOT NULL COMMENT 'filename with extension of the update.',
+  `hash` char(40) DEFAULT '' COMMENT 'sha1 hash of the sql file.',
+  `state` enum('RELEASED','ARCHIVED') NOT NULL DEFAULT 'RELEASED' COMMENT 'defines if an update is released or archived.',
+  `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'timestamp when the query was applied.',
+  `speed` int(10) unsigned NOT NULL DEFAULT '0' COMMENT 'time the query takes to apply in ms.',
+  PRIMARY KEY (`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='List of all applied updates in this database.';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `updates`
+--
+
+LOCK TABLES `updates` WRITE;
+/*!40000 ALTER TABLE `updates` DISABLE KEYS */;
+INSERT INTO `updates` VALUES ('2015_03_20_00_characters.sql','B761760804EA73BD297F296C5C1919687DF7191C','ARCHIVED','2015-03-21 21:44:15',0),('2015_03_20_01_characters.sql','894F08B70449A5481FFAF394EE5571D7FC4D8A3A','ARCHIVED','2015-03-21 21:44:15',0),('2015_03_20_02_characters.sql','97D7BE0CAADC79F3F11B9FD296B8C6CD40FE593B','ARCHIVED','2015-03-21 21:44:51',0),('2015_06_26_00_characters_335.sql','C2CC6E50AFA1ACCBEBF77CC519AAEB09F3BBAEBC','ARCHIVED','2015-07-13 23:49:22',0),('2015_09_28_00_characters_335.sql','F8682A431D50E54BDC4AC0E7DBED21AE8AAB6AD4','ARCHIVED','2015-09-28 21:00:00',0),('2015_08_26_00_characters_335.sql','C7D6A3A00FECA3EBFF1E71744CA40D3076582374','ARCHIVED','2015-08-26 21:00:00',0),('2015_10_06_00_characters.sql','16842FDD7E8547F2260D3312F53EFF8761EFAB35','ARCHIVED','2015-10-06 16:06:38',0),('2015_10_07_00_characters.sql','E15AB463CEBE321001D7BFDEA4B662FF618728FD','ARCHIVED','2015-10-07 23:32:00',0),('2015_10_12_00_characters.sql','D6F9927BDED72AD0A81D6EC2C6500CBC34A39FA2','ARCHIVED','2015-10-12 15:35:47',0),('2015_10_28_00_characters.sql','622A9CA8FCE690429EBE23BA071A37C7A007BF8B','ARCHIVED','2015-10-19 14:32:22',0),('2015_10_29_00_characters_335.sql','4555A7F35C107E54C13D74D20F141039ED42943E','ARCHIVED','2015-10-29 17:05:43',0),('2015_11_03_00_characters.sql','CC045717B8FDD9733351E52A5302560CD08AAD57','ARCHIVED','2015-10-12 15:23:33',0),('2015_11_07_00_characters.sql','0ACDD35EC9745231BCFA701B78056DEF94D0CC53','ARCHIVED','2016-04-11 00:42:36',94),('2016_02_10_00_characters.sql','F1B4DA202819CABC7319A4470A2D224A34609E97','ARCHIVED','2016-02-10 00:00:00',0),('2016_03_13_2016_01_05_00_characters.sql','0EAD24977F40DE2476B4567DA2B477867CC0DA1A','ARCHIVED','2016-03-13 20:03:56',0),('2016_04_11_00_characters.sql','0ACDD35EC9745231BCFA701B78056DEF94D0CC53','RELEASED','2016-04-11 03:18:17',0);
+/*!40000 ALTER TABLE `updates` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `updates_include`
+--
+
+DROP TABLE IF EXISTS `updates_include`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `updates_include` (
+  `path` varchar(200) NOT NULL COMMENT 'directory to include. $ means relative to the source directory.',
+  `state` enum('RELEASED','ARCHIVED') NOT NULL DEFAULT 'RELEASED' COMMENT 'defines if the directory contains released or archived updates.',
+  PRIMARY KEY (`path`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='List of directories where we want to include sql updates.';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `updates_include`
+--
+
+LOCK TABLES `updates_include` WRITE;
+/*!40000 ALTER TABLE `updates_include` DISABLE KEYS */;
+INSERT INTO `updates_include` VALUES ('$/sql/updates/characters','RELEASED'),('$/sql/custom/characters','RELEASED'),('$/sql/old/3.3.5a/characters','ARCHIVED');
+/*!40000 ALTER TABLE `updates_include` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -2517,4 +2630,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2014-08-28 15:30:47
+-- Dump completed on 2016-04-11  2:32:17

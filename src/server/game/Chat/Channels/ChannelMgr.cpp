@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -39,14 +39,14 @@ ChannelMgr* ChannelMgr::forTeam(uint32 team)
     if (team == HORDE)
         return &hordeChannelMgr;
 
-    return NULL;
+    return nullptr;
 }
 
 Channel* ChannelMgr::GetJoinChannel(std::string const& name, uint32 channelId)
 {
     std::wstring wname;
     if (!Utf8toWStr(name, wname))
-        return NULL;
+        return nullptr;
 
     wstrToLower(wname);
 
@@ -66,7 +66,7 @@ Channel* ChannelMgr::GetChannel(std::string const& name, Player* player, bool pk
 {
     std::wstring wname;
     if (!Utf8toWStr(name, wname))
-        return NULL;
+        return nullptr;
 
     wstrToLower(wname);
 
@@ -81,7 +81,7 @@ Channel* ChannelMgr::GetChannel(std::string const& name, Player* player, bool pk
             player->GetSession()->SendPacket(&data);
         }
 
-        return NULL;
+        return nullptr;
     }
 
     return i->second;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,6 +23,12 @@
 #include "AuctionHouseBot.h"
 #include "AuctionHouseBotBuyer.h"
 #include "AuctionHouseBotSeller.h"
+
+AuctionBotConfig* AuctionBotConfig::instance()
+{
+    static AuctionBotConfig instance;
+    return &instance;
+}
 
 bool AuctionBotConfig::Initialize()
 {
@@ -97,6 +103,11 @@ void AuctionBotConfig::SetConfig(AuctionBotConfigBoolValues index, char const* f
     SetConfig(index, sConfigMgr->GetBoolDefault(fieldname, defvalue));
 }
 
+void AuctionBotConfig::SetConfig(AuctionBotConfigFloatValues index, char const* fieldname, float defvalue)
+{
+    SetConfig(index, sConfigMgr->GetFloatDefault(fieldname, defvalue));
+}
+
 //Get AuctionHousebot configuration file
 void AuctionBotConfig::GetConfigFromFile()
 {
@@ -110,6 +121,8 @@ void AuctionBotConfig::GetConfigFromFile()
     SetConfig(CONFIG_AHBOT_BUYER_ALLIANCE_ENABLED, "AuctionHouseBot.Buyer.Alliance.Enabled", false);
     SetConfig(CONFIG_AHBOT_BUYER_HORDE_ENABLED, "AuctionHouseBot.Buyer.Horde.Enabled", false);
     SetConfig(CONFIG_AHBOT_BUYER_NEUTRAL_ENABLED, "AuctionHouseBot.Buyer.Neutral.Enabled", false);
+
+    SetConfig(CONFIG_AHBOT_BUYER_CHANCE_FACTOR, "AuctionHouseBot.Buyer.ChanceFactor", 2.0f);
 
     SetConfig(CONFIG_AHBOT_ITEMS_VENDOR, "AuctionHouseBot.Items.Vendor", false);
     SetConfig(CONFIG_AHBOT_ITEMS_LOOT, "AuctionHouseBot.Items.Loot", true);
@@ -204,14 +217,24 @@ void AuctionBotConfig::GetConfigFromFile()
     SetConfig(CONFIG_AHBOT_MINTIME, "AuctionHouseBot.MinTime", 1);
     SetConfig(CONFIG_AHBOT_MAXTIME, "AuctionHouseBot.MaxTime", 72);
 
-    SetConfigMinMax(CONFIG_AHBOT_BUYER_CHANCE_RATIO_ALLIANCE, "AuctionHouseBot.Buyer.Alliance.Chance.Ratio", 3, 1, 100);
-    SetConfigMinMax(CONFIG_AHBOT_BUYER_CHANCE_RATIO_HORDE, "AuctionHouseBot.Buyer.Horde.Chance.Ratio", 3, 1, 100);
-    SetConfigMinMax(CONFIG_AHBOT_BUYER_CHANCE_RATIO_NEUTRAL, "AuctionHouseBot.Buyer.Neutral.Chance.Ratio", 3, 1, 100);
     SetConfigMinMax(CONFIG_AHBOT_BUYER_RECHECK_INTERVAL, "AuctionHouseBot.Buyer.Recheck.Interval", 20, 1, DAY / MINUTE);
+    SetConfig(CONFIG_AHBOT_BUYER_BASEPRICE_GRAY, "AuctionHouseBot.Buyer.Baseprice.Gray", 3504);
+    SetConfig(CONFIG_AHBOT_BUYER_BASEPRICE_WHITE, "AuctionHouseBot.Buyer.Baseprice.White", 5429);
+    SetConfig(CONFIG_AHBOT_BUYER_BASEPRICE_GREEN, "AuctionHouseBot.Buyer.Baseprice.Green", 21752);
+    SetConfig(CONFIG_AHBOT_BUYER_BASEPRICE_BLUE, "AuctionHouseBot.Buyer.Baseprice.Blue", 36463);
+    SetConfig(CONFIG_AHBOT_BUYER_BASEPRICE_PURPLE, "AuctionHouseBot.Buyer.Baseprice.Purple", 87124);
+    SetConfig(CONFIG_AHBOT_BUYER_BASEPRICE_ORANGE, "AuctionHouseBot.Buyer.Baseprice.Orange", 214347);
+    SetConfig(CONFIG_AHBOT_BUYER_BASEPRICE_YELLOW, "AuctionHouseBot.Buyer.Baseprice.Yellow", 407406);
+    SetConfig(CONFIG_AHBOT_BUYER_CHANCEMULTIPLIER_GRAY, "AuctionHouseBot.Buyer.ChanceMultiplier.Gray", 100);
+    SetConfig(CONFIG_AHBOT_BUYER_CHANCEMULTIPLIER_WHITE, "AuctionHouseBot.Buyer.ChanceMultiplier.White", 100);
+    SetConfig(CONFIG_AHBOT_BUYER_CHANCEMULTIPLIER_GREEN, "AuctionHouseBot.Buyer.ChanceMultiplier.Green", 100);
+    SetConfig(CONFIG_AHBOT_BUYER_CHANCEMULTIPLIER_BLUE, "AuctionHouseBot.Buyer.ChanceMultiplier.Blue", 100);
+    SetConfig(CONFIG_AHBOT_BUYER_CHANCEMULTIPLIER_PURPLE, "AuctionHouseBot.Buyer.ChanceMultiplier.Purple", 100);
+    SetConfig(CONFIG_AHBOT_BUYER_CHANCEMULTIPLIER_ORANGE, "AuctionHouseBot.Buyer.ChanceMultiplier.Orange", 100);
+    SetConfig(CONFIG_AHBOT_BUYER_CHANCEMULTIPLIER_YELLOW, "AuctionHouseBot.Buyer.ChanceMultiplier.Yellow", 100);
 
     SetConfig(CONFIG_AHBOT_SELLER_ENABLED, "AuctionHouseBot.Seller.Enabled", false);
     SetConfig(CONFIG_AHBOT_BUYER_ENABLED, "AuctionHouseBot.Buyer.Enabled", false);
-    SetConfig(CONFIG_AHBOT_BUYPRICE_BUYER, "AuctionHouseBot.Buyer.Buyprice", true);
 
     SetConfig(CONFIG_AHBOT_CLASS_MISC_MOUNT_MIN_REQ_LEVEL, "AuctionHouseBot.Class.Misc.Mount.ReqLevel.Min", 0);
     SetConfig(CONFIG_AHBOT_CLASS_MISC_MOUNT_MAX_REQ_LEVEL, "AuctionHouseBot.Class.Misc.Mount.ReqLevel.Max", 0);
@@ -225,11 +248,27 @@ void AuctionBotConfig::GetConfigFromFile()
     SetConfig(CONFIG_AHBOT_CLASS_TRADEGOOD_MAX_ITEM_LEVEL, "AuctionHouseBot.Class.TradeGood.ItemLevel.Max", 0);
     SetConfig(CONFIG_AHBOT_CLASS_CONTAINER_MIN_ITEM_LEVEL, "AuctionHouseBot.Class.Container.ItemLevel.Min", 0);
     SetConfig(CONFIG_AHBOT_CLASS_CONTAINER_MAX_ITEM_LEVEL, "AuctionHouseBot.Class.Container.ItemLevel.Max", 0);
+
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_CONSUMABLE, "AuctionHouseBot.Class.RandomStackRatio.Consumable", 20);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_CONTAINER, "AuctionHouseBot.Class.RandomStackRatio.Container", 0);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_WEAPON, "AuctionHouseBot.Class.RandomStackRatio.Weapon", 0);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_GEM, "AuctionHouseBot.Class.RandomStackRatio.Gem", 20);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_ARMOR, "AuctionHouseBot.Class.RandomStackRatio.Armor", 0);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_REAGENT, "AuctionHouseBot.Class.RandomStackRatio.Reagent", 100);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_PROJECTILE, "AuctionHouseBot.Class.RandomStackRatio.Projectile", 100);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_TRADEGOOD, "AuctionHouseBot.Class.RandomStackRatio.TradeGood", 50);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_GENERIC, "AuctionHouseBot.Class.RandomStackRatio.Generic", 100);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_RECIPE, "AuctionHouseBot.Class.RandomStackRatio.Recipe", 0);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_QUIVER, "AuctionHouseBot.Class.RandomStackRatio.Quiver", 0);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_QUEST, "AuctionHouseBot.Class.RandomStackRatio.Quest", 100);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_KEY, "AuctionHouseBot.Class.RandomStackRatio.Key", 100);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_MISC, "AuctionHouseBot.Class.RandomStackRatio.Misc", 100);
+    SetConfig(CONFIG_AHBOT_CLASS_RANDOMSTACKRATIO_GLYPH, "AuctionHouseBot.Class.RandomStackRatio.Glyph", 0);
 }
 
 char const* AuctionBotConfig::GetHouseTypeName(AuctionHouseType houseType)
 {
-    static char const* names[MAX_AUCTION_HOUSE_TYPE] = { "Alliance", "Horde", "Neutral" };
+    static char const* names[MAX_AUCTION_HOUSE_TYPE] = { "Neutral", "Alliance", "Horde" };
     return names[houseType];
 }
 
@@ -391,6 +430,12 @@ void AuctionHouseBot::Rebuild(bool all)
                 if (all || itr->second->bid == 0)           // expire now auction if no bid or forced
                     itr->second->expire_time = sWorld->GetGameTime();
     }
+}
+
+AuctionHouseBot* AuctionHouseBot::instance()
+{
+    static AuctionHouseBot instance;
+    return &instance;
 }
 
 void AuctionHouseBot::Update()

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -205,7 +205,7 @@ struct RotfaceHeightCheck
 
     bool operator()(Creature* stalker) const
     {
-        return stalker->GetPositionZ() < _rotface->GetPositionZ() + 5.0f;
+        return stalker->GetPositionZ() > _rotface->GetPositionZ() + 5.0f;
     }
 
 private:
@@ -316,15 +316,11 @@ class boss_professor_putricide : public CreatureScript
                     case NPC_GAS_CLOUD:
                         // no possible aura seen in sniff adding the aurastate
                         summon->ModifyAuraState(AURA_STATE_UNKNOWN22, true);
-                        summon->CastSpell(summon, SPELL_GASEOUS_BLOAT_PROC, true);
-                        summon->ApplySpellImmune(0, IMMUNITY_EFFECT, SPELL_EFFECT_KNOCK_BACK, true);
                         summon->SetReactState(REACT_PASSIVE);
                         break;
                     case NPC_VOLATILE_OOZE:
                         // no possible aura seen in sniff adding the aurastate
                         summon->ModifyAuraState(AURA_STATE_UNKNOWN19, true);
-                        summon->CastSpell(summon, SPELL_OOZE_ERUPTION_SEARCH_PERIODIC, true);
-                        summon->ApplySpellImmune(0, IMMUNITY_EFFECT, SPELL_EFFECT_KNOCK_BACK, true);
                         summon->SetReactState(REACT_PASSIVE);
                         break;
                     case NPC_CHOKING_GAS_BOMB:
@@ -371,21 +367,21 @@ class boss_professor_putricide : public CreatureScript
                 {
                     case POINT_FESTERGUT:
                         instance->SetBossState(DATA_FESTERGUT, IN_PROGRESS); // needed here for delayed gate close
-                        me->SetSpeed(MOVE_RUN, _baseSpeed, true);
+                        me->SetSpeedRate(MOVE_RUN, _baseSpeed);
                         DoAction(ACTION_FESTERGUT_GAS);
                         if (Creature* festergut = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_FESTERGUT)))
                             festergut->CastSpell(festergut, SPELL_GASEOUS_BLIGHT_LARGE, false, NULL, NULL, festergut->GetGUID());
                         break;
                     case POINT_ROTFACE:
                         instance->SetBossState(DATA_ROTFACE, IN_PROGRESS);   // needed here for delayed gate close
-                        me->SetSpeed(MOVE_RUN, _baseSpeed, true);
+                        me->SetSpeedRate(MOVE_RUN, _baseSpeed);
                         DoAction(ACTION_ROTFACE_OOZE);
                         events.ScheduleEvent(EVENT_ROTFACE_OOZE_FLOOD, 25000, 0, PHASE_ROTFACE);
                         break;
                     case POINT_TABLE:
                         // stop attack
                         me->GetMotionMaster()->MoveIdle();
-                        me->SetSpeed(MOVE_RUN, _baseSpeed, true);
+                        me->SetSpeedRate(MOVE_RUN, _baseSpeed);
                         if (GameObject* table = ObjectAccessor::GetGameObject(*me, instance->GetGuidData(DATA_PUTRICIDE_TABLE)))
                             me->SetFacingToObject(table);
                         // operating on new phase already
@@ -420,7 +416,7 @@ class boss_professor_putricide : public CreatureScript
                 {
                     case ACTION_FESTERGUT_COMBAT:
                         SetPhase(PHASE_FESTERGUT);
-                        me->SetSpeed(MOVE_RUN, _baseSpeed*2.0f, true);
+                        me->SetSpeedRate(MOVE_RUN, _baseSpeed*2.0f);
                         me->GetMotionMaster()->MovePoint(POINT_FESTERGUT, festergutWatchPos);
                         me->SetReactState(REACT_PASSIVE);
                         DoZoneInCombat(me);
@@ -437,7 +433,7 @@ class boss_professor_putricide : public CreatureScript
                     case ACTION_ROTFACE_COMBAT:
                     {
                         SetPhase(PHASE_ROTFACE);
-                        me->SetSpeed(MOVE_RUN, _baseSpeed*2.0f, true);
+                        me->SetSpeedRate(MOVE_RUN, _baseSpeed*2.0f);
                         me->GetMotionMaster()->MovePoint(POINT_ROTFACE, rotfaceWatchPos);
                         me->SetReactState(REACT_PASSIVE);
                         _oozeFloodStage = 0;
@@ -479,7 +475,7 @@ class boss_professor_putricide : public CreatureScript
                         events.ScheduleEvent(EVENT_ROTFACE_DIES, 4500, 0, PHASE_ROTFACE);
                         break;
                     case ACTION_CHANGE_PHASE:
-                        me->SetSpeed(MOVE_RUN, _baseSpeed*2.0f, true);
+                        me->SetSpeedRate(MOVE_RUN, _baseSpeed*2.0f);
                         events.DelayEvents(30000);
                         me->AttackStop();
                         if (!IsHeroic())
@@ -564,7 +560,7 @@ class boss_professor_putricide : public CreatureScript
 
             void UpdateAI(uint32 diff) override
             {
-                if ((!(events.IsInPhase(PHASE_ROTFACE) || events.IsInPhase(PHASE_FESTERGUT)) && !UpdateVictim()) || !CheckInRoom())
+                if (!(events.IsInPhase(PHASE_ROTFACE) || events.IsInPhase(PHASE_FESTERGUT)) && !UpdateVictim())
                     return;
 
                 events.Update(diff);
@@ -616,7 +612,7 @@ class boss_professor_putricide : public CreatureScript
                             DoCast(me, SPELL_TEAR_GAS_PERIODIC_TRIGGER, true);
                             break;
                         case EVENT_RESUME_ATTACK:
-                            me->SetReactState(REACT_DEFENSIVE);
+                            me->SetReactState(REACT_AGGRESSIVE);
                             AttackStart(me->GetVictim());
                             // remove Tear Gas
                             me->RemoveAurasDueToSpell(SPELL_TEAR_GAS_PERIODIC_TRIGGER);
@@ -690,6 +686,9 @@ class boss_professor_putricide : public CreatureScript
                         default:
                             break;
                     }
+
+                    if (me->HasUnitState(UNIT_STATE_CASTING))
+                        return;
                 }
 
                 DoMeleeAttackIfReady();
@@ -718,15 +717,18 @@ class boss_professor_putricide : public CreatureScript
 class npc_putricide_oozeAI : public ScriptedAI
 {
     public:
-        npc_putricide_oozeAI(Creature* creature, uint32 hitTargetSpellId) : ScriptedAI(creature),
-            _hitTargetSpellId(hitTargetSpellId), _newTargetSelectTimer(0)
-        {
-        }
+        npc_putricide_oozeAI(Creature* creature, uint32 auraSpellId, uint32 hitTargetSpellId) : ScriptedAI(creature),
+            _auraSpellId(auraSpellId), _hitTargetSpellId(hitTargetSpellId), _newTargetSelectTimer(0) { }
 
         void SpellHitTarget(Unit* /*target*/, SpellInfo const* spell) override
         {
             if (!_newTargetSelectTimer && spell->Id == sSpellMgr->GetSpellIdForDifficulty(_hitTargetSpellId, me))
                 _newTargetSelectTimer = 1000;
+        }
+
+        void Reset() override
+        {
+            DoCastAOE(_auraSpellId, true);
         }
 
         void SpellHit(Unit* /*caster*/, SpellInfo const* spell) override
@@ -763,6 +765,7 @@ class npc_putricide_oozeAI : public ScriptedAI
         virtual void CastMainSpell() = 0;
 
     private:
+        uint32 _auraSpellId;
         uint32 _hitTargetSpellId;
         uint32 _newTargetSelectTimer;
 };
@@ -774,11 +777,9 @@ class npc_volatile_ooze : public CreatureScript
 
         struct npc_volatile_oozeAI : public npc_putricide_oozeAI
         {
-            npc_volatile_oozeAI(Creature* creature) : npc_putricide_oozeAI(creature, SPELL_OOZE_ERUPTION)
-            {
-            }
+            npc_volatile_oozeAI(Creature* creature) : npc_putricide_oozeAI(creature, SPELL_OOZE_ERUPTION_SEARCH_PERIODIC, SPELL_OOZE_ERUPTION) { }
 
-            void CastMainSpell()
+            void CastMainSpell() override
             {
                 me->CastSpell(me, SPELL_VOLATILE_OOZE_ADHESIVE, false);
             }
@@ -797,12 +798,12 @@ class npc_gas_cloud : public CreatureScript
 
         struct npc_gas_cloudAI : public npc_putricide_oozeAI
         {
-            npc_gas_cloudAI(Creature* creature) : npc_putricide_oozeAI(creature, SPELL_EXPUNGED_GAS)
+            npc_gas_cloudAI(Creature* creature) : npc_putricide_oozeAI(creature, SPELL_GASEOUS_BLOAT_PROC, SPELL_EXPUNGED_GAS)
             {
                 _newTargetSelectTimer = 0;
             }
 
-            void CastMainSpell()
+            void CastMainSpell() override
             {
                 me->CastCustomSpell(SPELL_GASEOUS_BLOAT, SPELLVALUE_AURA_STACK, 10, me, false);
             }
@@ -1031,7 +1032,7 @@ class spell_putricide_unstable_experiment : public SpellScriptLoader
                         break;
                 }
 
-                GetCaster()->CastSpell(target, uint32(GetSpellInfo()->Effects[stage].CalcValue()), true, NULL, NULL, GetCaster()->GetGUID());
+                GetCaster()->CastSpell(target, uint32(GetSpellInfo()->Effects[stage].CalcValue()), true);
             }
 
             void Register() override
@@ -1060,8 +1061,8 @@ class spell_putricide_ooze_eruption_searcher : public SpellScriptLoader
                 uint32 adhesiveId = sSpellMgr->GetSpellIdForDifficulty(SPELL_VOLATILE_OOZE_ADHESIVE, GetCaster());
                 if (GetHitUnit()->HasAura(adhesiveId))
                 {
-                    GetCaster()->CastSpell(GetHitUnit(), SPELL_OOZE_ERUPTION, true);
                     GetHitUnit()->RemoveAurasDueToSpell(adhesiveId, GetCaster()->GetGUID(), 0, AURA_REMOVE_BY_ENEMY_SPELL);
+                    GetCaster()->CastSpell(GetHitUnit(), SPELL_OOZE_ERUPTION, true);
                 }
             }
 
@@ -1259,7 +1260,7 @@ class spell_putricide_mutated_plague : public SpellScriptLoader
                     return;
 
                 uint32 triggerSpell = GetSpellInfo()->Effects[aurEff->GetEffIndex()].TriggerSpell;
-                SpellInfo const* spell = sSpellMgr->GetSpellInfo(triggerSpell);
+                SpellInfo const* spell = sSpellMgr->AssertSpellInfo(triggerSpell);
                 spell = sSpellMgr->GetSpellForDifficultyFromSpell(spell, caster);
 
                 int32 damage = spell->Effects[EFFECT_0].CalcValue(caster);

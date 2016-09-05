@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 TrinityCore <http://www.trinitycore.org/>
+ * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -26,10 +26,6 @@
 #include "Opcodes.h"
 #include "Spell.h"
 #include "Totem.h"
-#include "TemporarySummon.h"
-#include "SpellAuras.h"
-#include "CreatureAI.h"
-#include "../../scripts/Custom/Transmog/Transmogrification.h"
 #include "ScriptMgr.h"
 #include "GameObjectAI.h"
 #include "SpellAuraEffects.h"
@@ -65,7 +61,7 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
     Player* pUser = _player;
 
     // ignore for remote control state
-    if (pUser->m_mover != pUser)
+    if (pUser->m_unitMovedByMe != pUser)
         return;
 
     uint8 bagIndex, slot, castFlags;
@@ -176,7 +172,7 @@ void WorldSession::HandleOpenItemOpcode(WorldPacket& recvPacket)
     Player* pUser = _player;
 
     // ignore for remote control state
-    if (pUser->m_mover != pUser)
+    if (pUser->m_unitMovedByMe != pUser)
         return;
 
     uint8 bagIndex, slot;
@@ -200,11 +196,11 @@ void WorldSession::HandleOpenItemOpcode(WorldPacket& recvPacket)
     }
 
     // Verify that the bag is an actual bag or wrapped item that can be used "normally"
-    if (!(proto->Flags & ITEM_PROTO_FLAG_OPENABLE) && !item->HasFlag(ITEM_FIELD_FLAGS, ITEM_FLAG_WRAPPED))
+    if (!(proto->Flags & ITEM_PROTO_FLAG_HAS_LOOT) && !item->HasFlag(ITEM_FIELD_FLAGS, ITEM_FLAG_WRAPPED))
     {
         pUser->SendEquipError(EQUIP_ERR_CANT_DO_RIGHT_NOW, item, NULL);
-        TC_LOG_ERROR("network", "Possible hacking attempt: Player %s [guid: %u] tried to open item [guid: %u, entry: %u] which is not openable!",
-                pUser->GetName().c_str(), pUser->GetGUIDLow(), item->GetGUIDLow(), proto->ItemId);
+        TC_LOG_ERROR("entities.player.cheat", "Possible hacking attempt: Player %s [guid: %u] tried to open item [guid: %u, entry: %u] which is not openable!",
+                pUser->GetName().c_str(), pUser->GetGUID().GetCounter(), item->GetGUID().GetCounter(), proto->ItemId);
         return;
     }
 
@@ -217,7 +213,7 @@ void WorldSession::HandleOpenItemOpcode(WorldPacket& recvPacket)
         if (!lockInfo)
         {
             pUser->SendEquipError(EQUIP_ERR_ITEM_LOCKED, item, NULL);
-            TC_LOG_ERROR("network", "WORLD::OpenItem: item [guid = %u] has an unknown lockId: %u!", item->GetGUIDLow(), lockId);
+            TC_LOG_ERROR("network", "WORLD::OpenItem: item [guid = %u] has an unknown lockId: %u!", item->GetGUID().GetCounter(), lockId);
             return;
         }
 
@@ -233,7 +229,7 @@ void WorldSession::HandleOpenItemOpcode(WorldPacket& recvPacket)
     {
         PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHARACTER_GIFT_BY_ITEM);
 
-        stmt->setUInt32(0, item->GetGUIDLow());
+        stmt->setUInt32(0, item->GetGUID().GetCounter());
 
         PreparedQueryResult result = CharacterDatabase.Query(stmt);
 
@@ -250,14 +246,14 @@ void WorldSession::HandleOpenItemOpcode(WorldPacket& recvPacket)
         }
         else
         {
-            TC_LOG_ERROR("network", "Wrapped item %u don't have record in character_gifts table and will deleted", item->GetGUIDLow());
+            TC_LOG_ERROR("network", "Wrapped item %u don't have record in character_gifts table and will deleted", item->GetGUID().GetCounter());
             pUser->DestroyItem(item->GetBagSlot(), item->GetSlot(), true);
             return;
         }
 
         stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GIFT);
 
-        stmt->setUInt32(0, item->GetGUIDLow());
+        stmt->setUInt32(0, item->GetGUID().GetCounter());
 
         CharacterDatabase.Execute(stmt);
     }
@@ -272,14 +268,11 @@ void WorldSession::HandleGameObjectUseOpcode(WorldPacket& recvData)
 
     TC_LOG_DEBUG("network", "WORLD: Recvd CMSG_GAMEOBJ_USE Message [%s]", guid.ToString().c_str());
 
-    if (GameObject* obj = GetPlayer()->GetMap()->GetGameObject(guid))
+    if (GameObject* obj = GetPlayer()->GetGameObjectIfCanInteractWith(guid))
     {
-        if (!obj->IsWithinDistInMap(GetPlayer(), obj->GetInteractionDistance()))
-            return;
-
         // ignore for remote control state
-        if (GetPlayer()->m_mover != GetPlayer())
-            if (!(GetPlayer()->IsOnVehicle(GetPlayer()->m_mover) || GetPlayer()->IsMounted()) && !obj->GetGOInfo()->IsUsableMounted())
+        if (GetPlayer()->m_unitMovedByMe != GetPlayer())
+            if (!(GetPlayer()->IsOnVehicle(GetPlayer()->m_unitMovedByMe) || GetPlayer()->IsMounted()) && !obj->GetGOInfo()->IsUsableMounted())
                 return;
 
         obj->Use(GetPlayer());
@@ -294,20 +287,16 @@ void WorldSession::HandleGameobjectReportUse(WorldPacket& recvPacket)
     TC_LOG_DEBUG("network", "WORLD: Recvd CMSG_GAMEOBJ_REPORT_USE Message [%s]", guid.ToString().c_str());
 
     // ignore for remote control state
-    if (_player->m_mover != _player)
+    if (_player->m_unitMovedByMe != _player)
         return;
 
-    GameObject* go = GetPlayer()->GetMap()->GetGameObject(guid);
-    if (!go)
-        return;
+    if (GameObject* go = GetPlayer()->GetGameObjectIfCanInteractWith(guid))
+    {
+        if (go->AI()->GossipHello(_player))
+            return;
 
-    if (!go->IsWithinDistInMap(_player, INTERACTION_DISTANCE))
-        return;
-
-    if (go->AI()->GossipHello(_player))
-        return;
-
-    _player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_USE_GAMEOBJECT, go->GetEntry());
+        _player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_USE_GAMEOBJECT, go->GetEntry());
+    }
 }
 
 void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
@@ -319,7 +308,7 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
     TC_LOG_DEBUG("network", "WORLD: got cast spell packet, castCount: %u, spellId: %u, castFlags: %u, data length = %u", castCount, spellId, castFlags, (uint32)recvPacket.size());
 
     // ignore for remote control state (for player case)
-    Unit* mover = _player->m_mover;
+    Unit* mover = _player->m_unitMovedByMe;
     if (mover != _player && mover->GetTypeId() == TYPEID_PLAYER)
     {
         recvPacket.rfinish(); // prevent spam at ignore packet
@@ -418,7 +407,7 @@ void WorldSession::HandleCancelAuraOpcode(WorldPacket& recvPacket)
         return;
 
     // not allow remove spells with attr SPELL_ATTR0_CANT_CANCEL
-    if (spellInfo->Attributes & SPELL_ATTR0_CANT_CANCEL)
+    if (spellInfo->HasAttribute(SPELL_ATTR0_CANT_CANCEL))
         return;
 
     // channeled spell case (it currently cast then)
@@ -495,8 +484,6 @@ void WorldSession::HandlePetCancelAuraOpcode(WorldPacket& recvPacket)
     }
 
     pet->RemoveOwnedAura(spellId, ObjectGuid::Empty, 0, AURA_REMOVE_BY_CANCEL);
-
-    pet->AddCreatureSpellCooldown(spellId);
 }
 
 void WorldSession::HandleCancelGrowthAuraOpcode(WorldPacket& /*recvPacket*/) { }
@@ -513,7 +500,7 @@ void WorldSession::HandleCancelChanneling(WorldPacket& recvData)
     recvData.read_skip<uint32>();                          // spellid, not used
 
     // ignore for remote control state (for player case)
-    Unit* mover = _player->m_mover;
+    Unit* mover = _player->m_unitMovedByMe;
     if (mover != _player && mover->GetTypeId() == TYPEID_PLAYER)
         return;
 
@@ -523,7 +510,7 @@ void WorldSession::HandleCancelChanneling(WorldPacket& recvData)
 void WorldSession::HandleTotemDestroyed(WorldPacket& recvPacket)
 {
     // ignore for remote control state
-    if (_player->m_mover != _player)
+    if (_player->m_unitMovedByMe != _player)
         return;
 
     uint8 slotId;
@@ -585,7 +572,7 @@ void WorldSession::HandleMirrorImageDataRequest(WorldPacket& recvData)
     recvData >> guid;
 
     // Get unit for which data is needed by client
-    Unit* unit = ObjectAccessor::GetObjectInWorld(guid, (Unit*)NULL);
+    Unit* unit = ObjectAccessor::GetUnit(*_player, guid);
     if (!unit)
         return;
 
@@ -607,11 +594,11 @@ void WorldSession::HandleMirrorImageDataRequest(WorldPacket& recvData)
     if (creator->GetTypeId() == TYPEID_PLAYER)
     {
         Player* player = creator->ToPlayer();
-        data << uint8(player->GetByteValue(PLAYER_BYTES, 0));   // skin
-        data << uint8(player->GetByteValue(PLAYER_BYTES, 1));   // face
-        data << uint8(player->GetByteValue(PLAYER_BYTES, 2));   // hair
-        data << uint8(player->GetByteValue(PLAYER_BYTES, 3));   // haircolor
-        data << uint8(player->GetByteValue(PLAYER_BYTES_2, 0)); // facialhair
+        data << uint8(player->GetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_SKIN_ID));
+        data << uint8(player->GetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_FACE_ID));
+        data << uint8(player->GetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_HAIR_STYLE_ID));
+        data << uint8(player->GetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_HAIR_COLOR_ID));
+        data << uint8(player->GetByteValue(PLAYER_BYTES_2, PLAYER_BYTES_2_OFFSET_FACIAL_STYLE));
         data << uint32(player->GetGuildId());                   // unk
 
         static EquipmentSlots const itemSlots[] =
@@ -638,12 +625,7 @@ void WorldSession::HandleMirrorImageDataRequest(WorldPacket& recvData)
             else if (*itr == EQUIPMENT_SLOT_BACK && player->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_CLOAK))
                 data << uint32(0);
             else if (Item const* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, *itr))
-            {
-                if (uint32 entry = sTransmogrification->GetFakeEntry(item))
-                    data << uint32(sObjectMgr->GetItemTemplate(entry)->DisplayInfoID);
-                else
-                    data << uint32(item->GetTemplate()->DisplayInfoID);
-            }
+                data << uint32(item->GetTemplate()->DisplayInfoID);
             else
                 data << uint32(0);
         }
